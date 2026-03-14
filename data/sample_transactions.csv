@@ -1,0 +1,57 @@
+date,description,amount,category
+2025-01-02,Gehalt Januar,3200.00,Gehalt
+2025-01-03,REWE Supermarkt,-67.43,Lebensmittel
+2025-01-05,Miete Januar,-850.00,Miete & Wohnen
+2025-01-06,Netflix Abo,-12.99,Unterhaltung
+2025-01-07,Deutsche Bahn Ticket,-34.50,Transport
+2025-01-08,Edeka Einkauf,-42.18,Lebensmittel
+2025-01-10,Allianz Versicherung,-89.00,Versicherung
+2025-01-12,Restaurant Bella Italia,-38.50,Restaurant & Cafe
+2025-01-14,Tankstelle Shell,-55.00,Transport
+2025-01-15,Zalando Bestellung,-79.99,Shopping
+2025-01-17,Lidl Einkauf,-31.25,Lebensmittel
+2025-01-18,Spotify Premium,-9.99,Unterhaltung
+2025-01-20,Apotheke Medikament,-15.80,Gesundheit
+2025-01-22,REWE Wocheneinkauf,-58.34,Lebensmittel
+2025-01-25,Strom Abschlag,-65.00,Miete & Wohnen
+2025-01-27,Kino Tickets,-24.00,Unterhaltung
+2025-01-28,Semesterbeitrag,-312.50,Bildung
+2025-01-30,Sparplan ETF,-200.00,Sparen & Investieren
+2025-02-01,Gehalt Februar,3200.00,Gehalt
+2025-02-02,Miete Februar,-850.00,Miete & Wohnen
+2025-02-03,REWE Supermarkt,-71.20,Lebensmittel
+2025-02-05,Fitnessstudio Beitrag,-29.99,Gesundheit
+2025-02-07,Lieferando Pizza,-22.50,Restaurant & Cafe
+2025-02-08,Amazon Bestellung,-45.99,Shopping
+2025-02-10,Edeka Einkauf,-55.30,Lebensmittel
+2025-02-11,BVG Monatskarte,-86.00,Transport
+2025-02-13,Cafe Latte,-4.50,Restaurant & Cafe
+2025-02-14,Blumenstrauss Valentinstag,-25.00,Shopping
+2025-02-15,Zahnarzt Rechnung,-85.00,Gesundheit
+2025-02-17,Lidl Wocheneinkauf,-38.90,Lebensmittel
+2025-02-18,Netflix Abo,-12.99,Unterhaltung
+2025-02-19,Spotify Premium,-9.99,Unterhaltung
+2025-02-20,TK Krankenkasse,-95.00,Versicherung
+2025-02-22,Udemy Kurs Python,-14.99,Bildung
+2025-02-24,REWE Einkauf,-62.40,Lebensmittel
+2025-02-25,Strom Abschlag,-65.00,Miete & Wohnen
+2025-02-27,Sparplan ETF,-200.00,Sparen & Investieren
+2025-02-28,Bonus Arbeitgeber,500.00,Gehalt
+2025-03-01,Gehalt Maerz,3200.00,Gehalt
+2025-03-02,Miete Maerz,-850.00,Miete & Wohnen
+2025-03-03,REWE Supermarkt,-59.80,Lebensmittel
+2025-03-04,Tankstelle Aral,-52.00,Transport
+2025-03-06,Mediamarkt Kopfhoerer,-129.00,Shopping
+2025-03-07,Edeka Einkauf,-48.75,Lebensmittel
+2025-03-09,Restaurant Sushi,-42.00,Restaurant & Cafe
+2025-03-10,Allianz Versicherung,-89.00,Versicherung
+2025-03-12,Lidl Einkauf,-35.60,Lebensmittel
+2025-03-13,Netflix Abo,-12.99,Unterhaltung
+2025-03-14,Spotify Premium,-9.99,Unterhaltung
+2025-03-15,Apotheke,-8.50,Gesundheit
+2025-03-17,REWE Wocheneinkauf,-66.30,Lebensmittel
+2025-03-19,Doener Imbiss,-7.50,Restaurant & Cafe
+2025-03-20,Strom Abschlag,-65.00,Miete & Wohnen
+2025-03-22,Buchhandlung,-18.90,Bildung
+2025-03-24,Sparplan ETF,-200.00,Sparen & Investieren
+2025-03-25,Freelance Projekt,450.00,Gehalt
