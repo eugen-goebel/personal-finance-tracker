@@ -8,6 +8,7 @@ To run:
     streamlit run app.py
 """
 
+import io
 import os
 from datetime import date, datetime
 
@@ -320,7 +321,7 @@ elif page == "Import Data":
 
             # Preview
             with st.expander("Preview"):
-                preview_df = pd.read_csv(__import__("io").StringIO(content))
+                preview_df = pd.read_csv(io.StringIO(content))
                 st.dataframe(preview_df.head(10), use_container_width=True)
 
             if st.button("Import"):
