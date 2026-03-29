@@ -8,7 +8,7 @@ and trend analysis from transaction data.
 from datetime import date
 from dataclasses import dataclass, field
 
-from sqlalchemy import func, extract
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from db.models import Transaction
