@@ -5,7 +5,6 @@ Reads CSV files (like bank statement exports), validates the data,
 and stores transactions in the database.
 """
 
-import csv
 import io
 from datetime import date, datetime
 from dataclasses import dataclass, field
