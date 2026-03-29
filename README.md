@@ -2,6 +2,7 @@
 
 A full-stack personal finance application with a REST API, interactive dashboard, and intelligent transaction categorization. Manage transactions, set budgets, and analyze spending trends — all running locally without any API key.
 
+![CI](https://github.com/eugen-goebel/personal-finance-tracker/actions/workflows/tests.yml/badge.svg)
 ![Python](https://img.shields.io/badge/Python-3.10+-blue)
 ![Tests](https://img.shields.io/badge/Tests-65_passed-brightgreen)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688)
