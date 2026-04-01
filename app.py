@@ -23,6 +23,7 @@ from agents.analytics import AnalyticsAgent
 from agents.budget import BudgetAgent
 from agents.report import ReportAgent
 from agents.categorizer import CategorizerAgent
+from agents.bank_statement_parser import BankStatementParser
 
 
 # ---------------------------------------------------------------------------
@@ -330,5 +331,53 @@ elif page == "Import Data":
                 if result.errors:
                     for e in result.errors:
                         st.error(e)
+        finally:
+            db.close()
+
+    st.divider()
+
+    # Bank statement upload (MT940 / OFX)
+    st.subheader("Upload Bank Statement")
+    st.caption("Supported formats: MT940 (.sta, .mt940), OFX (.ofx, .qfx)")
+
+    statement_file = st.file_uploader(
+        "Choose bank statement file",
+        type=["sta", "mt940", "ofx", "qfx"],
+        key="bank_statement",
+    )
+    if statement_file:
+        db = get_session()
+        try:
+            parser = BankStatementParser()
+            raw = statement_file.read()
+            transactions = parser.parse(raw, statement_file.name)
+
+            st.info(f"Found {len(transactions)} transactions in statement")
+
+            if transactions:
+                preview_data = [
+                    {"Date": t.date, "Description": t.description, "Amount": t.amount}
+                    for t in transactions[:10]
+                ]
+                with st.expander("Preview (first 10)"):
+                    st.dataframe(pd.DataFrame(preview_data), use_container_width=True)
+
+                if st.button("Import Statement", key="import_statement"):
+                    agent = DataIngestionAgent(db)
+                    imported = 0
+                    errors = []
+                    for i, txn_input in enumerate(transactions, 1):
+                        try:
+                            agent.add_transaction(txn_input)
+                            imported += 1
+                        except Exception as exc:
+                            errors.append(f"Transaction {i}: {exc}")
+
+                    st.success(f"Imported {imported} of {len(transactions)} transactions")
+                    if errors:
+                        for e in errors:
+                            st.error(e)
+        except ValueError as exc:
+            st.error(f"Failed to parse statement: {exc}")
         finally:
             db.close()
