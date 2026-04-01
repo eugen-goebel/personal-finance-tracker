@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from db.database import get_db
 from api.schemas import TransactionCreate, TransactionResponse, ImportResponse, MessageResponse
 from agents.data_ingestion import DataIngestionAgent, TransactionInput
+from agents.bank_statement_parser import BankStatementParser, SUPPORTED_EXTENSIONS
 
 router = APIRouter(prefix="/api/transactions", tags=["Transactions"])
 
@@ -73,4 +74,43 @@ async def import_csv(file: UploadFile = File(...), db: Session = Depends(get_db)
         imported=result.imported,
         skipped=result.skipped,
         errors=result.errors,
+    )
+
+
+@router.post("/import-statement", response_model=ImportResponse)
+async def import_bank_statement(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    """Import transactions from a bank statement (MT940, OFX, QFX)."""
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Filename is required")
+
+    ext = file.filename[file.filename.rfind("."):].lower() if "." in file.filename else ""
+    if ext not in SUPPORTED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported format. Supported: {', '.join(sorted(SUPPORTED_EXTENSIONS))}",
+        )
+
+    content = await file.read()
+    parser = BankStatementParser()
+    try:
+        transactions = parser.parse(content, file.filename)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    agent = DataIngestionAgent(db)
+    imported = 0
+    errors = []
+
+    for i, txn_input in enumerate(transactions, 1):
+        try:
+            agent.add_transaction(txn_input)
+            imported += 1
+        except Exception as exc:
+            errors.append(f"Transaction {i}: {exc}")
+
+    return ImportResponse(
+        total_rows=len(transactions),
+        imported=imported,
+        skipped=len(transactions) - imported,
+        errors=errors,
     )
