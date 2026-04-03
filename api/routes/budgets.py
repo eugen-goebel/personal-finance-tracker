@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from db.database import get_db
 from api.schemas import BudgetCreate, BudgetResponse, MessageResponse
 from agents.budget import BudgetAgent
+from agents.alert_service import AlertService
 
 router = APIRouter(prefix="/api/budgets", tags=["Budgets"])
 
@@ -67,4 +68,25 @@ def budget_status(
             }
             for b in overview.budgets
         ],
+    }
+
+
+@router.post("/alerts")
+def send_budget_alerts(
+    year: int | None = None,
+    month: int | None = None,
+    dry_run: bool = True,
+    db: Session = Depends(get_db),
+):
+    """Check budgets and send alert emails for exceeded/warning thresholds."""
+    service = AlertService(db)
+    result = service.check_and_alert(year=year, month=month, dry_run=dry_run)
+
+    return {
+        "year": result.year,
+        "month": result.month,
+        "alerts_triggered": result.alerts_triggered,
+        "warnings": result.warnings,
+        "email_sent": result.email_sent,
+        "error": result.error,
     }
