@@ -9,6 +9,23 @@ A full-stack personal finance application with a REST API, interactive dashboard
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.40+-red)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
+## Screenshots
+
+**Financial Dashboard** — KPI cards (income, expenses, net balance, savings rate) with monthly trend chart
+![Dashboard](docs/screenshots/01-dashboard.png)
+
+**Spending by Category** — category-level breakdown alongside live budget status
+![Spending Categories](docs/screenshots/02-spending-categories.png)
+
+**Transactions** — searchable transaction ledger with auto-detected categories
+![Transactions](docs/screenshots/03-transactions.png)
+
+**Budget Management** — set monthly category limits and track usage
+![Budget Management](docs/screenshots/04-budget-management.png)
+
+**Import** — load sample data or upload CSV / MT940 / DFX / OFX bank statements
+![Import](docs/screenshots/05-import.png)
+
 ## Features
 
 - **REST API** (FastAPI) with auto-generated Swagger documentation at `/docs`
