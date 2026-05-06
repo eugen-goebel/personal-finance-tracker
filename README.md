@@ -4,7 +4,7 @@ A full-stack personal finance application with a REST API, interactive dashboard
 
 ![CI](https://github.com/eugen-goebel/personal-finance-tracker/actions/workflows/tests.yml/badge.svg)
 ![Python](https://img.shields.io/badge/Python-3.10+-blue)
-![Tests](https://img.shields.io/badge/Tests-65_passed-brightgreen)
+![Tests](https://img.shields.io/badge/Tests-98_passed-brightgreen)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.40+-red)
 ![License](https://img.shields.io/badge/License-MIT-green)
