@@ -13,7 +13,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from db.database import init_db
-from api.routes import transactions, analytics, budgets
+from api.routes import transactions, analytics, budgets, savings_goals
 
 
 @asynccontextmanager
@@ -34,6 +34,7 @@ app = FastAPI(
 app.include_router(transactions.router)
 app.include_router(analytics.router)
 app.include_router(budgets.router)
+app.include_router(savings_goals.router)
 
 
 @app.get("/", tags=["Health"])
