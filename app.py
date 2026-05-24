@@ -16,7 +16,7 @@ import streamlit as st
 import pandas as pd
 
 from db.database import Base, get_engine
-from db.models import Transaction, Budget
+from db.models import Transaction, Budget, SavingsGoal
 from sqlalchemy.orm import sessionmaker
 from agents.data_ingestion import DataIngestionAgent
 from agents.analytics import AnalyticsAgent
@@ -24,6 +24,7 @@ from agents.budget import BudgetAgent
 from agents.report import ReportAgent
 from agents.categorizer import CategorizerAgent
 from agents.bank_statement_parser import BankStatementParser
+from agents.savings_goals import SavingsGoalsAgent
 
 
 # ---------------------------------------------------------------------------
@@ -61,7 +62,7 @@ with st.sidebar:
     st.divider()
     page = st.radio(
         "Navigation",
-        ["Dashboard", "Transactions", "Budgets", "Import Data"],
+        ["Dashboard", "Transactions", "Budgets", "Savings Goals", "Import Data"],
         label_visibility="collapsed",
     )
 
@@ -279,6 +280,95 @@ elif page == "Budgets":
                     st.warning(w)
         else:
             st.info("No budgets configured yet. Set one above.")
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
+# Savings Goals page
+# ---------------------------------------------------------------------------
+
+elif page == "Savings Goals":
+    st.title("Savings Goals")
+    st.caption("Set targets, track progress, and see what monthly contribution gets you there.")
+
+    db = get_session()
+    try:
+        agent = SavingsGoalsAgent(db)
+
+        # --- Add new goal form ---
+        with st.expander("➕ Add new goal", expanded=False):
+            with st.form("new_goal_form", clear_on_submit=True):
+                col1, col2 = st.columns(2)
+                with col1:
+                    new_name = st.text_input("Name", placeholder="Vacation 2026")
+                    new_target = st.number_input("Target amount (EUR)", min_value=1.0, value=1000.0, step=100.0)
+                with col2:
+                    new_current = st.number_input("Already saved (EUR)", min_value=0.0, value=0.0, step=50.0)
+                    new_deadline = st.date_input("Target date (optional)", value=None)
+                submitted = st.form_submit_button("Create goal", type="primary")
+                if submitted and new_name.strip():
+                    try:
+                        agent.create_goal(
+                            name=new_name.strip(),
+                            target_amount=float(new_target),
+                            current_amount=float(new_current),
+                            target_date=new_deadline,
+                        )
+                        st.success(f"Goal '{new_name}' created")
+                        st.rerun()
+                    except ValueError as exc:
+                        st.error(str(exc))
+
+        # --- List existing goals as cards ---
+        goals = agent.list_goals()
+        if not goals:
+            st.info("No goals yet — add one above to get started.")
+        else:
+            for goal in goals:
+                progress = SavingsGoalsAgent.compute_progress(goal)
+                with st.container(border=True):
+                    title_col, action_col = st.columns([4, 1])
+                    with title_col:
+                        st.subheader(goal.name)
+                        if goal.target_date:
+                            st.caption(f"Deadline: {goal.target_date.isoformat()}")
+                    with action_col:
+                        if st.button("Delete", key=f"del_{goal.id}"):
+                            agent.delete_goal(goal.id)
+                            st.rerun()
+
+                    st.progress(min(progress.progress_pct / 100, 1.0))
+                    metric_cols = st.columns(4)
+                    metric_cols[0].metric("Target", f"€{goal.target_amount:,.0f}")
+                    metric_cols[1].metric("Saved", f"€{goal.current_amount:,.0f}")
+                    metric_cols[2].metric("Remaining", f"€{progress.remaining_amount:,.0f}")
+                    if progress.days_left is not None:
+                        days_label = f"{progress.days_left} days" if progress.days_left >= 0 else f"{-progress.days_left} days overdue"
+                        metric_cols[3].metric("Time", days_label)
+                    elif progress.monthly_contribution_needed is not None:
+                        metric_cols[3].metric("Monthly", f"€{progress.monthly_contribution_needed:,.0f}")
+
+                    if progress.monthly_contribution_needed is not None and progress.days_left and progress.days_left > 0:
+                        st.caption(
+                            f"To hit the target on time you need to save about "
+                            f"€{progress.monthly_contribution_needed:,.0f} / month."
+                        )
+
+                    with st.expander("💰 Add contribution"):
+                        contrib_col1, contrib_col2 = st.columns([3, 1])
+                        with contrib_col1:
+                            contribution = st.number_input(
+                                "Amount (EUR)", min_value=1.0, value=50.0,
+                                step=10.0, key=f"contrib_{goal.id}",
+                            )
+                        with contrib_col2:
+                            if st.button("Add", key=f"add_contrib_{goal.id}", type="primary"):
+                                try:
+                                    agent.contribute(goal.id, float(contribution))
+                                    st.rerun()
+                                except ValueError as exc:
+                                    st.error(str(exc))
     finally:
         db.close()
 

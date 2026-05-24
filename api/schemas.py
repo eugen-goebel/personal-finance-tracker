@@ -76,3 +76,69 @@ class ImportResponse(BaseModel):
 class MessageResponse(BaseModel):
     """Simple message response."""
     message: str
+
+
+# ---------------------------------------------------------------------------
+# Savings goals
+# ---------------------------------------------------------------------------
+
+class GoalCreate(BaseModel):
+    """Payload to create a savings goal."""
+    name: str
+    target_amount: float
+    current_amount: float = 0.0
+    target_date: date | None = None
+
+    @field_validator("target_amount")
+    @classmethod
+    def target_positive(cls, v: float) -> float:
+        if v <= 0:
+            raise ValueError("target_amount must be positive")
+        return round(v, 2)
+
+    @field_validator("current_amount")
+    @classmethod
+    def current_non_negative(cls, v: float) -> float:
+        if v < 0:
+            raise ValueError("current_amount cannot be negative")
+        return round(v, 2)
+
+
+class GoalUpdate(BaseModel):
+    """Payload to partially update a savings goal."""
+    name: str | None = None
+    target_amount: float | None = None
+    current_amount: float | None = None
+    target_date: date | None = None
+    clear_target_date: bool = False
+
+
+class GoalContribution(BaseModel):
+    """Payload to add to current_amount of a goal."""
+    amount: float
+
+    @field_validator("amount")
+    @classmethod
+    def positive(cls, v: float) -> float:
+        if v <= 0:
+            raise ValueError("contribution must be positive")
+        return round(v, 2)
+
+
+class GoalProgressResponse(BaseModel):
+    progress_pct: float
+    remaining_amount: float
+    days_left: int | None
+    monthly_contribution_needed: float | None
+
+
+class GoalResponse(BaseModel):
+    """Response for a savings goal including computed progress."""
+    id: int
+    name: str
+    target_amount: float
+    current_amount: float
+    target_date: date | None
+    progress: GoalProgressResponse
+
+    model_config = {"from_attributes": True}
