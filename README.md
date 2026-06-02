@@ -1,6 +1,6 @@
 # Personal Finance Tracker
 
-A full-stack personal finance application with a REST API, interactive dashboard, and intelligent transaction categorization. Manage transactions, set budgets, and analyze spending trends — all running locally without any API key.
+A full-stack personal finance application with a REST API, interactive dashboard, and intelligent transaction categorization. Manage transactions, set budgets, and analyze spending trends, all running locally without any API key.
 
 ![CI](https://github.com/eugen-goebel/personal-finance-tracker/actions/workflows/tests.yml/badge.svg)
 ![Python](https://img.shields.io/badge/Python-3.10+-blue)
@@ -11,31 +11,31 @@ A full-stack personal finance application with a REST API, interactive dashboard
 
 ## Screenshots
 
-**Financial Dashboard** — KPI cards (income, expenses, net balance, savings rate) with monthly trend chart
+**Financial Dashboard**: KPI cards (income, expenses, net balance, savings rate) with monthly trend chart
 ![Dashboard](docs/screenshots/01-dashboard.png)
 
-**Spending by Category** — category-level breakdown alongside live budget status
+**Spending by Category**: category-level breakdown alongside live budget status
 ![Spending Categories](docs/screenshots/02-spending-categories.png)
 
-**Transactions** — searchable transaction ledger with auto-detected categories
+**Transactions**: searchable transaction ledger with auto-detected categories
 ![Transactions](docs/screenshots/03-transactions.png)
 
-**Budget Management** — set monthly category limits and track usage
+**Budget Management**: set monthly category limits and track usage
 ![Budget Management](docs/screenshots/04-budget-management.png)
 
-**Import** — load sample data or upload CSV / MT940 / DFX / OFX bank statements
+**Import**: load sample data or upload CSV / MT940 / DFX / OFX bank statements
 ![Import](docs/screenshots/05-import.png)
 
 ## Features
 
 - **REST API** (FastAPI) with auto-generated Swagger documentation at `/docs`
-- **SQLite Database** with SQLAlchemy ORM — no database server needed
-- **Smart Categorization** — auto-detects categories from transaction descriptions (German & English)
-- **Budget Monitoring** — set monthly limits per category, get warnings at 80% usage
-- **Financial Analytics** — monthly summaries, savings rate, spending trends, category breakdowns
-- **CSV Import** — upload bank statement exports
-- **Streamlit Dashboard** — interactive charts and budget tracking
-- **No API Key Required** — everything runs locally
+- **SQLite Database** with SQLAlchemy ORM, no database server needed
+- **Smart Categorization**: auto-detects categories from transaction descriptions (German & English)
+- **Budget Monitoring**: set monthly limits per category, get warnings at 80% usage
+- **Financial Analytics**: monthly summaries, savings rate, spending trends, category breakdowns
+- **CSV Import**: upload bank statement exports
+- **Streamlit Dashboard**: interactive charts and budget tracking
+- **No API Key Required**: everything runs locally
 
 ## Architecture
 
@@ -130,7 +130,7 @@ The dashboard provides:
 
 ## Sample Data
 
-Includes 3 months of realistic transaction data (`data/sample_transactions.csv`) with German descriptions — salary, rent, groceries, subscriptions, insurance, and more.
+Includes 3 months of realistic transaction data (`data/sample_transactions.csv`) with German descriptions: salary, rent, groceries, subscriptions, insurance, and more.
 
 ## Testing
 
@@ -176,12 +176,12 @@ personal-finance-tracker/
 
 ## Tech Stack
 
-- **FastAPI** — REST API with automatic OpenAPI docs
-- **SQLAlchemy** — ORM for database access
-- **SQLite** — Embedded database (no server needed)
-- **Streamlit** — Interactive web dashboard
-- **pandas** — Data manipulation & CSV parsing
-- **Pydantic** — Request/response validation
+- **FastAPI**: REST API with automatic OpenAPI docs
+- **SQLAlchemy**: ORM for database access
+- **SQLite**: Embedded database (no server needed)
+- **Streamlit**: Interactive web dashboard
+- **pandas**: Data manipulation & CSV parsing
+- **Pydantic**: Request/response validation
 
 ## License
 
