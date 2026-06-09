@@ -24,3 +24,8 @@ Thumbs.db
 
 # Output
 output/
+
+# Coverage
+.coverage
+coverage.xml
+htmlcov/
