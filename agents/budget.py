@@ -5,8 +5,8 @@ Allows setting monthly limits per category and checks
 current spending against those limits.
 """
 
+from dataclasses import dataclass
 from datetime import date
-from dataclasses import dataclass, field
 
 from sqlalchemy.orm import Session
 
@@ -16,6 +16,7 @@ from db.models import Budget, Transaction
 @dataclass
 class BudgetStatus:
     """Status of a single budget category."""
+
     category: str
     monthly_limit: float
     spent: float
@@ -27,6 +28,7 @@ class BudgetStatus:
 @dataclass
 class BudgetOverview:
     """Overview of all budgets for a given month."""
+
     year: int
     month: int
     budgets: list[BudgetStatus]
@@ -45,11 +47,7 @@ class BudgetAgent:
 
     def set_budget(self, category: str, monthly_limit: float) -> Budget:
         """Set or update a monthly budget for a category."""
-        existing = (
-            self.db.query(Budget)
-            .filter(Budget.category == category)
-            .first()
-        )
+        existing = self.db.query(Budget).filter(Budget.category == category).first()
 
         if existing:
             existing.monthly_limit = monthly_limit
@@ -69,11 +67,7 @@ class BudgetAgent:
 
     def delete_budget(self, category: str) -> bool:
         """Delete a budget by category name."""
-        budget = (
-            self.db.query(Budget)
-            .filter(Budget.category == category)
-            .first()
-        )
+        budget = self.db.query(Budget).filter(Budget.category == category).first()
         if budget:
             self.db.delete(budget)
             self.db.commit()
@@ -125,20 +119,23 @@ class BudgetAgent:
             else:
                 status = "ok"
 
-            statuses.append(BudgetStatus(
-                category=budget.category,
-                monthly_limit=budget.monthly_limit,
-                spent=spent,
-                remaining=remaining,
-                percentage_used=pct,
-                status=status,
-            ))
+            statuses.append(
+                BudgetStatus(
+                    category=budget.category,
+                    monthly_limit=budget.monthly_limit,
+                    spent=spent,
+                    remaining=remaining,
+                    percentage_used=pct,
+                    status=status,
+                )
+            )
 
             total_budget += budget.monthly_limit
             total_spent += spent
 
         return BudgetOverview(
-            year=year, month=month,
+            year=year,
+            month=month,
             budgets=statuses,
             warnings=warnings,
             total_budget=round(total_budget, 2),

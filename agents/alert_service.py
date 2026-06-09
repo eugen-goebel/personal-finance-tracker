@@ -13,8 +13,8 @@ import os
 import smtplib
 from dataclasses import dataclass, field
 from datetime import date
-from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 from sqlalchemy.orm import Session
 
@@ -24,6 +24,7 @@ from agents.budget import BudgetAgent, BudgetOverview
 @dataclass
 class AlertConfig:
     """SMTP configuration for sending alert emails."""
+
     smtp_host: str = ""
     smtp_port: int = 587
     smtp_user: str = ""
@@ -51,6 +52,7 @@ class AlertConfig:
 @dataclass
 class AlertResult:
     """Result of an alert check and notification attempt."""
+
     year: int
     month: int
     alerts_triggered: int
@@ -60,8 +62,19 @@ class AlertResult:
 
 
 MONTH_NAMES = [
-    "", "Januar", "Februar", "Maerz", "April", "Mai", "Juni",
-    "Juli", "August", "September", "Oktober", "November", "Dezember",
+    "",
+    "Januar",
+    "Februar",
+    "Maerz",
+    "April",
+    "Mai",
+    "Juni",
+    "Juli",
+    "August",
+    "September",
+    "Oktober",
+    "November",
+    "Dezember",
 ]
 
 

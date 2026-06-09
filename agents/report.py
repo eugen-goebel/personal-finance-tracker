@@ -13,6 +13,7 @@ from agents.analytics import AnalyticsResult
 @dataclass
 class FinancialReport:
     """A formatted financial report."""
+
     title: str
     sections: list[dict]  # {"heading": str, "content": str}
     raw_data: AnalyticsResult
@@ -21,42 +22,54 @@ class FinancialReport:
 class ReportAgent:
     """Generates readable financial reports from analytics data."""
 
-    def generate(self, analytics: AnalyticsResult, title: str = "Financial Report") -> FinancialReport:
+    def generate(
+        self, analytics: AnalyticsResult, title: str = "Financial Report"
+    ) -> FinancialReport:
         """Generate a complete financial report."""
         sections = []
 
         # Overview
-        sections.append({
-            "heading": "Overview",
-            "content": self._overview_section(analytics),
-        })
+        sections.append(
+            {
+                "heading": "Overview",
+                "content": self._overview_section(analytics),
+            }
+        )
 
         # Monthly breakdown
         if analytics.monthly_summaries:
-            sections.append({
-                "heading": "Monthly Breakdown",
-                "content": self._monthly_section(analytics),
-            })
+            sections.append(
+                {
+                    "heading": "Monthly Breakdown",
+                    "content": self._monthly_section(analytics),
+                }
+            )
 
         # Category breakdown
         if analytics.category_breakdown:
-            sections.append({
-                "heading": "Spending by Category",
-                "content": self._category_section(analytics),
-            })
+            sections.append(
+                {
+                    "heading": "Spending by Category",
+                    "content": self._category_section(analytics),
+                }
+            )
 
         # Top expenses
         if analytics.top_expenses:
-            sections.append({
-                "heading": "Top Expenses",
-                "content": self._top_expenses_section(analytics),
-            })
+            sections.append(
+                {
+                    "heading": "Top Expenses",
+                    "content": self._top_expenses_section(analytics),
+                }
+            )
 
         # Insights
-        sections.append({
-            "heading": "Insights",
-            "content": self._insights_section(analytics),
-        })
+        sections.append(
+            {
+                "heading": "Insights",
+                "content": self._insights_section(analytics),
+            }
+        )
 
         return FinancialReport(
             title=title,
@@ -90,10 +103,7 @@ class ReportAgent:
         lines = []
         for c in data.category_breakdown:
             bar = "█" * int(c.percentage / 5)
-            lines.append(
-                f"{c.category:<20s} {c.total:>9,.2f}  "
-                f"({c.percentage:>5.1f}%) {bar}"
-            )
+            lines.append(f"{c.category:<20s} {c.total:>9,.2f}  ({c.percentage:>5.1f}%) {bar}")
         return "\n".join(lines)
 
     def _top_expenses_section(self, data: AnalyticsResult) -> str:
@@ -110,11 +120,17 @@ class ReportAgent:
 
         # Savings rate assessment
         if data.savings_rate >= 20:
-            insights.append(f"Savings rate of {data.savings_rate:.1f}% is excellent (target: 20%+).")
+            insights.append(
+                f"Savings rate of {data.savings_rate:.1f}% is excellent (target: 20%+)."
+            )
         elif data.savings_rate >= 10:
-            insights.append(f"Savings rate of {data.savings_rate:.1f}% is good, but could be improved.")
+            insights.append(
+                f"Savings rate of {data.savings_rate:.1f}% is good, but could be improved."
+            )
         elif data.savings_rate > 0:
-            insights.append(f"Savings rate of {data.savings_rate:.1f}% is low. Consider reducing expenses.")
+            insights.append(
+                f"Savings rate of {data.savings_rate:.1f}% is low. Consider reducing expenses."
+            )
         else:
             insights.append("Spending exceeds income. Review expenses urgently.")
 
@@ -122,8 +138,7 @@ class ReportAgent:
         if data.category_breakdown:
             top = data.category_breakdown[0]
             insights.append(
-                f"Largest expense category: {top.category} "
-                f"({top.percentage:.1f}% of all spending)."
+                f"Largest expense category: {top.category} ({top.percentage:.1f}% of all spending)."
             )
 
         # Trend analysis
@@ -132,13 +147,9 @@ class ReportAgent:
             prev = data.trends[-2]
             if last.expenses > prev.expenses:
                 diff = last.expenses - prev.expenses
-                insights.append(
-                    f"Spending increased by {diff:,.2f} compared to previous month."
-                )
+                insights.append(f"Spending increased by {diff:,.2f} compared to previous month.")
             else:
                 diff = prev.expenses - last.expenses
-                insights.append(
-                    f"Spending decreased by {diff:,.2f} compared to previous month."
-                )
+                insights.append(f"Spending decreased by {diff:,.2f} compared to previous month.")
 
         return "\n".join(f"• {i}" for i in insights)

@@ -2,13 +2,13 @@
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
-from db.database import get_db
-from api.schemas import TransactionCreate, TransactionResponse, ImportResponse, MessageResponse
+from agents.bank_statement_parser import SUPPORTED_EXTENSIONS, BankStatementParser
 from agents.data_ingestion import DataIngestionAgent, TransactionInput
-from agents.bank_statement_parser import BankStatementParser, SUPPORTED_EXTENSIONS
+from api.schemas import ImportResponse, MessageResponse, TransactionCreate, TransactionResponse
+from db.database import get_db
 
 router = APIRouter(prefix="/api/transactions", tags=["Transactions"])
 
@@ -44,6 +44,7 @@ def list_transactions(
 def get_transaction(txn_id: int, db: Session = Depends(get_db)):
     """Get a single transaction by ID."""
     from db.models import Transaction
+
     txn = db.query(Transaction).filter(Transaction.id == txn_id).first()
     if not txn:
         raise HTTPException(status_code=404, detail="Transaction not found")
@@ -83,7 +84,7 @@ async def import_bank_statement(file: UploadFile = File(...), db: Session = Depe
     if not file.filename:
         raise HTTPException(status_code=400, detail="Filename is required")
 
-    ext = file.filename[file.filename.rfind("."):].lower() if "." in file.filename else ""
+    ext = file.filename[file.filename.rfind(".") :].lower() if "." in file.filename else ""
     if ext not in SUPPORTED_EXTENSIONS:
         raise HTTPException(
             status_code=400,
@@ -95,7 +96,7 @@ async def import_bank_statement(file: UploadFile = File(...), db: Session = Depe
     try:
         transactions = parser.parse(content, file.filename)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     agent = DataIngestionAgent(db)
     imported = 0

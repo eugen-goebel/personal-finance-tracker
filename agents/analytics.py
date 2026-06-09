@@ -5,10 +5,9 @@ Computes monthly summaries, savings rates, spending breakdowns,
 and trend analysis from transaction data.
 """
 
+from dataclasses import dataclass
 from datetime import date
-from dataclasses import dataclass, field
 
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from db.models import Transaction
@@ -17,6 +16,7 @@ from db.models import Transaction
 @dataclass
 class MonthlySummary:
     """Financial summary for a single month."""
+
     year: int
     month: int
     total_income: float
@@ -29,6 +29,7 @@ class MonthlySummary:
 @dataclass
 class CategoryBreakdown:
     """Spending breakdown for a category."""
+
     category: str
     total: float
     percentage: float
@@ -38,6 +39,7 @@ class CategoryBreakdown:
 @dataclass
 class Trend:
     """Monthly trend data point."""
+
     year: int
     month: int
     label: str  # "2025-01"
@@ -49,6 +51,7 @@ class Trend:
 @dataclass
 class AnalyticsResult:
     """Complete analytics overview."""
+
     total_income: float
     total_expenses: float
     net_balance: float
@@ -82,9 +85,15 @@ class AnalyticsAgent:
 
         if not transactions:
             return AnalyticsResult(
-                total_income=0, total_expenses=0, net_balance=0,
-                savings_rate=0, monthly_summaries=[], category_breakdown=[],
-                trends=[], top_expenses=[], transaction_count=0,
+                total_income=0,
+                total_expenses=0,
+                net_balance=0,
+                savings_rate=0,
+                monthly_summaries=[],
+                category_breakdown=[],
+                trends=[],
+                top_expenses=[],
+                transaction_count=0,
             )
 
         total_income = sum(t.amount for t in transactions if t.amount > 0)
@@ -118,14 +127,17 @@ class AnalyticsAgent:
             net = income - expenses
             rate = (net / income * 100) if income > 0 else 0
 
-            summaries.append(MonthlySummary(
-                year=year, month=month,
-                total_income=round(income, 2),
-                total_expenses=round(expenses, 2),
-                net=round(net, 2),
-                savings_rate=round(rate, 1),
-                transaction_count=len(txns),
-            ))
+            summaries.append(
+                MonthlySummary(
+                    year=year,
+                    month=month,
+                    total_income=round(income, 2),
+                    total_expenses=round(expenses, 2),
+                    net=round(net, 2),
+                    savings_rate=round(rate, 1),
+                    transaction_count=len(txns),
+                )
+            )
         return summaries
 
     def _category_breakdown(self, transactions: list[Transaction]) -> list[CategoryBreakdown]:
@@ -142,12 +154,14 @@ class AnalyticsAgent:
         breakdown = []
         for cat, txns in categories.items():
             cat_total = sum(abs(t.amount) for t in txns)
-            breakdown.append(CategoryBreakdown(
-                category=cat,
-                total=round(cat_total, 2),
-                percentage=round(cat_total / total * 100, 1),
-                transaction_count=len(txns),
-            ))
+            breakdown.append(
+                CategoryBreakdown(
+                    category=cat,
+                    total=round(cat_total, 2),
+                    percentage=round(cat_total / total * 100, 1),
+                    transaction_count=len(txns),
+                )
+            )
 
         return sorted(breakdown, key=lambda x: x.total, reverse=True)
 
@@ -162,13 +176,16 @@ class AnalyticsAgent:
         for (year, month), txns in sorted(months.items()):
             income = sum(t.amount for t in txns if t.amount > 0)
             expenses = sum(abs(t.amount) for t in txns if t.amount < 0)
-            trends.append(Trend(
-                year=year, month=month,
-                label=f"{year}-{month:02d}",
-                income=round(income, 2),
-                expenses=round(expenses, 2),
-                net=round(income - expenses, 2),
-            ))
+            trends.append(
+                Trend(
+                    year=year,
+                    month=month,
+                    label=f"{year}-{month:02d}",
+                    income=round(income, 2),
+                    expenses=round(expenses, 2),
+                    net=round(income - expenses, 2),
+                )
+            )
         return trends
 
     def _top_expenses(self, transactions: list[Transaction], limit: int = 10) -> list[dict]:
