@@ -10,22 +10,20 @@ To run:
 
 import io
 import os
-from datetime import date, datetime
+from datetime import date
 
-import streamlit as st
 import pandas as pd
-
-from db.database import Base, get_engine
-from db.models import Transaction, Budget, SavingsGoal
+import streamlit as st
 from sqlalchemy.orm import sessionmaker
-from agents.data_ingestion import DataIngestionAgent
-from agents.analytics import AnalyticsAgent
-from agents.budget import BudgetAgent
-from agents.report import ReportAgent
-from agents.categorizer import CategorizerAgent
-from agents.bank_statement_parser import BankStatementParser
-from agents.savings_goals import SavingsGoalsAgent
 
+from agents.analytics import AnalyticsAgent
+from agents.bank_statement_parser import BankStatementParser
+from agents.budget import BudgetAgent
+from agents.categorizer import CategorizerAgent
+from agents.data_ingestion import DataIngestionAgent
+from agents.report import ReportAgent
+from agents.savings_goals import SavingsGoalsAgent
+from db.database import Base, get_engine
 
 # ---------------------------------------------------------------------------
 # Database setup
@@ -79,7 +77,9 @@ if page == "Dashboard":
         result = analytics.get_summary()
 
         if result.transaction_count == 0:
-            st.warning("No transactions yet. Go to **Import Data** to load sample data or upload a CSV.")
+            st.warning(
+                "No transactions yet. Go to **Import Data** to load sample data or upload a CSV."
+            )
             st.stop()
 
         # Key metrics
@@ -94,10 +94,12 @@ if page == "Dashboard":
         # Trends chart
         if result.trends:
             st.subheader("Monthly Trends")
-            trend_df = pd.DataFrame([
-                {"Month": t.label, "Income": t.income, "Expenses": t.expenses}
-                for t in result.trends
-            ])
+            trend_df = pd.DataFrame(
+                [
+                    {"Month": t.label, "Income": t.income, "Expenses": t.expenses}
+                    for t in result.trends
+                ]
+            )
             trend_df = trend_df.set_index("Month")
             st.bar_chart(trend_df)
 
@@ -107,10 +109,16 @@ if page == "Dashboard":
         with col_left:
             if result.category_breakdown:
                 st.subheader("Spending by Category")
-                cat_df = pd.DataFrame([
-                    {"Category": c.category, "Amount": c.total, "Percent": f"{c.percentage:.1f}%"}
-                    for c in result.category_breakdown
-                ])
+                cat_df = pd.DataFrame(
+                    [
+                        {
+                            "Category": c.category,
+                            "Amount": c.total,
+                            "Percent": f"{c.percentage:.1f}%",
+                        }
+                        for c in result.category_breakdown
+                    ]
+                )
                 st.dataframe(cat_df, use_container_width=True, hide_index=True)
 
         with col_right:
@@ -120,7 +128,9 @@ if page == "Dashboard":
             if overview.budgets:
                 st.subheader("Budget Status")
                 for b in overview.budgets:
-                    color = "🔴" if b.status == "exceeded" else "🟡" if b.status == "warning" else "🟢"
+                    color = (
+                        "🔴" if b.status == "exceeded" else "🟡" if b.status == "warning" else "🟢"
+                    )
                     st.write(f"{color} **{b.category}**: {b.spent:.2f} / {b.monthly_limit:.2f}")
                     st.progress(min(b.percentage_used / 100, 1.0))
 
@@ -161,7 +171,9 @@ elif page == "Transactions":
                 txn_date = st.date_input("Date", value=date.today())
                 description = st.text_input("Description", placeholder="e.g., REWE Einkauf")
             with col2:
-                amount = st.number_input("Amount", step=0.01, help="Negative = expense, positive = income")
+                amount = st.number_input(
+                    "Amount", step=0.01, help="Negative = expense, positive = income"
+                )
                 categorizer = CategorizerAgent()
                 categories = categorizer.available_categories
                 category = st.selectbox("Category (optional)", ["Auto-detect"] + categories)
@@ -172,10 +184,13 @@ elif page == "Transactions":
                 try:
                     agent = DataIngestionAgent(db)
                     from agents.data_ingestion import TransactionInput
+
                     cat = None if category == "Auto-detect" else category
                     txn_input = TransactionInput(
-                        date=txn_date, description=description,
-                        amount=amount, category=cat,
+                        date=txn_date,
+                        description=description,
+                        amount=amount,
+                        category=cat,
                     )
                     txn = agent.add_transaction(txn_input)
                     st.success(f"Added: {txn.description} ({txn.amount:+.2f}) → {txn.category}")
@@ -202,17 +217,19 @@ elif page == "Transactions":
         )
 
         if txns:
-            df = pd.DataFrame([
-                {
-                    "ID": t.id,
-                    "Date": str(t.date),
-                    "Description": t.description,
-                    "Amount": f"{t.amount:+,.2f}",
-                    "Category": t.category,
-                    "Type": t.transaction_type,
-                }
-                for t in txns
-            ])
+            df = pd.DataFrame(
+                [
+                    {
+                        "ID": t.id,
+                        "Date": str(t.date),
+                        "Description": t.description,
+                        "Amount": f"{t.amount:+,.2f}",
+                        "Category": t.category,
+                        "Type": t.transaction_type,
+                    }
+                    for t in txns
+                ]
+            )
             st.dataframe(df, use_container_width=True, hide_index=True)
             st.caption(f"{len(txns)} transactions")
         else:
@@ -266,7 +283,9 @@ elif page == "Budgets":
             for b in overview.budgets:
                 col1, col2, col3 = st.columns([3, 1, 1])
                 with col1:
-                    color = "🔴" if b.status == "exceeded" else "🟡" if b.status == "warning" else "🟢"
+                    color = (
+                        "🔴" if b.status == "exceeded" else "🟡" if b.status == "warning" else "🟢"
+                    )
                     st.write(f"{color} **{b.category}**")
                     st.progress(min(b.percentage_used / 100, 1.0))
                 with col2:
@@ -302,9 +321,13 @@ elif page == "Savings Goals":
                 col1, col2 = st.columns(2)
                 with col1:
                     new_name = st.text_input("Name", placeholder="Vacation 2026")
-                    new_target = st.number_input("Target amount (EUR)", min_value=1.0, value=1000.0, step=100.0)
+                    new_target = st.number_input(
+                        "Target amount (EUR)", min_value=1.0, value=1000.0, step=100.0
+                    )
                 with col2:
-                    new_current = st.number_input("Already saved (EUR)", min_value=0.0, value=0.0, step=50.0)
+                    new_current = st.number_input(
+                        "Already saved (EUR)", min_value=0.0, value=0.0, step=50.0
+                    )
                     new_deadline = st.date_input("Target date (optional)", value=None)
                 submitted = st.form_submit_button("Create goal", type="primary")
                 if submitted and new_name.strip():
@@ -344,12 +367,22 @@ elif page == "Savings Goals":
                     metric_cols[1].metric("Saved", f"€{goal.current_amount:,.0f}")
                     metric_cols[2].metric("Remaining", f"€{progress.remaining_amount:,.0f}")
                     if progress.days_left is not None:
-                        days_label = f"{progress.days_left} days" if progress.days_left >= 0 else f"{-progress.days_left} days overdue"
+                        days_label = (
+                            f"{progress.days_left} days"
+                            if progress.days_left >= 0
+                            else f"{-progress.days_left} days overdue"
+                        )
                         metric_cols[3].metric("Time", days_label)
                     elif progress.monthly_contribution_needed is not None:
-                        metric_cols[3].metric("Monthly", f"€{progress.monthly_contribution_needed:,.0f}")
+                        metric_cols[3].metric(
+                            "Monthly", f"€{progress.monthly_contribution_needed:,.0f}"
+                        )
 
-                    if progress.monthly_contribution_needed is not None and progress.days_left and progress.days_left > 0:
+                    if (
+                        progress.monthly_contribution_needed is not None
+                        and progress.days_left
+                        and progress.days_left > 0
+                    ):
                         st.caption(
                             f"To hit the target on time you need to save about "
                             f"€{progress.monthly_contribution_needed:,.0f} / month."
@@ -359,8 +392,11 @@ elif page == "Savings Goals":
                         contrib_col1, contrib_col2 = st.columns([3, 1])
                         with contrib_col1:
                             contribution = st.number_input(
-                                "Amount (EUR)", min_value=1.0, value=50.0,
-                                step=10.0, key=f"contrib_{goal.id}",
+                                "Amount (EUR)",
+                                min_value=1.0,
+                                value=50.0,
+                                step=10.0,
+                                key=f"contrib_{goal.id}",
                             )
                         with contrib_col2:
                             if st.button("Add", key=f"add_contrib_{goal.id}", type="primary"):
@@ -387,7 +423,7 @@ elif page == "Import Data":
             db = get_session()
             try:
                 agent = DataIngestionAgent(db)
-                with open(sample_path, "r") as f:
+                with open(sample_path) as f:
                     result = agent.import_csv(f.read())
                 st.success(f"Imported {result.imported} of {result.total_rows} transactions")
                 if result.errors:

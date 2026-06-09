@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
-from typing import Optional
 
 from sqlalchemy.orm import Session
 
@@ -17,8 +16,8 @@ class GoalProgress:
 
     progress_pct: float
     remaining_amount: float
-    days_left: Optional[int]
-    monthly_contribution_needed: Optional[float]
+    days_left: int | None
+    monthly_contribution_needed: float | None
 
 
 class SavingsGoalsAgent:
@@ -35,7 +34,7 @@ class SavingsGoalsAgent:
         self,
         name: str,
         target_amount: float,
-        target_date: Optional[date] = None,
+        target_date: date | None = None,
         current_amount: float = 0.0,
     ) -> SavingsGoal:
         if target_amount <= 0:
@@ -43,9 +42,7 @@ class SavingsGoalsAgent:
         if current_amount < 0:
             raise ValueError("current_amount cannot be negative")
 
-        existing = (
-            self.db.query(SavingsGoal).filter(SavingsGoal.name == name).first()
-        )
+        existing = self.db.query(SavingsGoal).filter(SavingsGoal.name == name).first()
         if existing:
             raise ValueError(f"A goal named '{name}' already exists")
 
@@ -63,19 +60,19 @@ class SavingsGoalsAgent:
     def list_goals(self) -> list[SavingsGoal]:
         return self.db.query(SavingsGoal).order_by(SavingsGoal.created_at).all()
 
-    def get_goal(self, goal_id: int) -> Optional[SavingsGoal]:
+    def get_goal(self, goal_id: int) -> SavingsGoal | None:
         return self.db.get(SavingsGoal, goal_id)
 
     def update_goal(
         self,
         goal_id: int,
         *,
-        name: Optional[str] = None,
-        target_amount: Optional[float] = None,
-        current_amount: Optional[float] = None,
-        target_date: Optional[date] = None,
+        name: str | None = None,
+        target_amount: float | None = None,
+        current_amount: float | None = None,
+        target_date: date | None = None,
         clear_target_date: bool = False,
-    ) -> Optional[SavingsGoal]:
+    ) -> SavingsGoal | None:
         goal = self.get_goal(goal_id)
         if goal is None:
             return None
@@ -99,7 +96,7 @@ class SavingsGoalsAgent:
         self.db.refresh(goal)
         return goal
 
-    def contribute(self, goal_id: int, amount: float) -> Optional[SavingsGoal]:
+    def contribute(self, goal_id: int, amount: float) -> SavingsGoal | None:
         """Add ``amount`` to ``current_amount`` of the goal."""
         if amount <= 0:
             raise ValueError("contribution must be positive")
@@ -124,7 +121,7 @@ class SavingsGoalsAgent:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def compute_progress(goal: SavingsGoal, *, today: Optional[date] = None) -> GoalProgress:
+    def compute_progress(goal: SavingsGoal, *, today: date | None = None) -> GoalProgress:
         today = today or datetime.now(timezone.utc).date()
 
         if goal.target_amount <= 0:
@@ -134,8 +131,8 @@ class SavingsGoalsAgent:
 
         remaining_amount = max(goal.target_amount - goal.current_amount, 0.0)
 
-        days_left: Optional[int] = None
-        monthly_needed: Optional[float] = None
+        days_left: int | None = None
+        monthly_needed: float | None = None
         if goal.target_date is not None:
             days_left = (goal.target_date - today).days
             if days_left > 0 and remaining_amount > 0:

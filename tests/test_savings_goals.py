@@ -4,17 +4,17 @@ from datetime import date, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import sessionmaker
 
 from agents.savings_goals import GoalProgress, SavingsGoalsAgent
 from api.main import app
 from db.database import Base, get_db, get_engine
 from db.models import SavingsGoal
-from sqlalchemy.orm import sessionmaker
-
 
 # ---------------------------------------------------------------------------
 # Agent-level tests
 # ---------------------------------------------------------------------------
+
 
 class TestSavingsGoalsAgent:
     def test_create_goal(self, db):
@@ -83,6 +83,7 @@ class TestSavingsGoalsAgent:
 # Progress maths
 # ---------------------------------------------------------------------------
 
+
 class TestComputeProgress:
     def test_open_ended_goal_has_no_deadline_fields(self):
         goal = SavingsGoal(name="Open", target_amount=1000, current_amount=200)
@@ -94,7 +95,9 @@ class TestComputeProgress:
 
     def test_past_due_goal_returns_negative_days(self):
         goal = SavingsGoal(
-            name="Late", target_amount=500, current_amount=100,
+            name="Late",
+            target_amount=500,
+            current_amount=100,
             target_date=date(2026, 1, 1),
         )
         p = SavingsGoalsAgent.compute_progress(goal, today=date(2026, 3, 1))
@@ -110,7 +113,9 @@ class TestComputeProgress:
     def test_monthly_contribution_computed(self):
         # 2000 target, 500 saved, 90 days left → 1500 / ~3 months
         goal = SavingsGoal(
-            name="Plan", target_amount=2000, current_amount=500,
+            name="Plan",
+            target_amount=2000,
+            current_amount=500,
             target_date=date(2026, 8, 1),
         )
         p = SavingsGoalsAgent.compute_progress(goal, today=date(2026, 5, 3))
@@ -127,6 +132,7 @@ class TestComputeProgress:
 # ---------------------------------------------------------------------------
 # API smoke tests
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def api_client(tmp_path):

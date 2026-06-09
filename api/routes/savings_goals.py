@@ -45,7 +45,7 @@ def create_goal(data: GoalCreate, db: Session = Depends(get_db)):
             current_amount=data.current_amount,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return _to_response(goal)
 
 
@@ -77,7 +77,7 @@ def update_goal(goal_id: int, data: GoalUpdate, db: Session = Depends(get_db)):
             clear_target_date=data.clear_target_date,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     if goal is None:
         raise HTTPException(status_code=404, detail="Savings goal not found")
     return _to_response(goal)
@@ -89,7 +89,7 @@ def contribute(goal_id: int, data: GoalContribution, db: Session = Depends(get_d
     try:
         goal = agent.contribute(goal_id, data.amount)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     if goal is None:
         raise HTTPException(status_code=404, detail="Savings goal not found")
     return _to_response(goal)

@@ -6,11 +6,13 @@ FastAPI uses them to auto-generate documentation (Swagger UI).
 """
 
 from datetime import date
+
 from pydantic import BaseModel, field_validator
 
 
 class TransactionCreate(BaseModel):
     """Request body for creating a transaction."""
+
     date: date
     description: str
     amount: float
@@ -33,6 +35,7 @@ class TransactionCreate(BaseModel):
 
 class TransactionResponse(BaseModel):
     """Response for a single transaction."""
+
     id: int
     date: date
     description: str
@@ -45,6 +48,7 @@ class TransactionResponse(BaseModel):
 
 class BudgetCreate(BaseModel):
     """Request body for setting a budget."""
+
     category: str
     monthly_limit: float
 
@@ -58,6 +62,7 @@ class BudgetCreate(BaseModel):
 
 class BudgetResponse(BaseModel):
     """Response for a single budget."""
+
     id: int
     category: str
     monthly_limit: float
@@ -67,6 +72,7 @@ class BudgetResponse(BaseModel):
 
 class ImportResponse(BaseModel):
     """Response for a CSV import."""
+
     total_rows: int
     imported: int
     skipped: int
@@ -75,6 +81,7 @@ class ImportResponse(BaseModel):
 
 class MessageResponse(BaseModel):
     """Simple message response."""
+
     message: str
 
 
@@ -82,8 +89,10 @@ class MessageResponse(BaseModel):
 # Savings goals
 # ---------------------------------------------------------------------------
 
+
 class GoalCreate(BaseModel):
     """Payload to create a savings goal."""
+
     name: str
     target_amount: float
     current_amount: float = 0.0
@@ -106,6 +115,7 @@ class GoalCreate(BaseModel):
 
 class GoalUpdate(BaseModel):
     """Payload to partially update a savings goal."""
+
     name: str | None = None
     target_amount: float | None = None
     current_amount: float | None = None
@@ -115,6 +125,7 @@ class GoalUpdate(BaseModel):
 
 class GoalContribution(BaseModel):
     """Payload to add to current_amount of a goal."""
+
     amount: float
 
     @field_validator("amount")
@@ -134,6 +145,7 @@ class GoalProgressResponse(BaseModel):
 
 class GoalResponse(BaseModel):
     """Response for a savings goal including computed progress."""
+
     id: int
     name: str
     target_amount: float

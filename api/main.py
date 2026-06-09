@@ -12,8 +12,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from api.routes import analytics, budgets, savings_goals, transactions
 from db.database import init_db
-from api.routes import transactions, analytics, budgets, savings_goals
 
 
 @asynccontextmanager

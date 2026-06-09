@@ -7,13 +7,14 @@ wird als einfache SQLite-Datei gespeichert (kein Server nötig).
 """
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, DeclarativeBase
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 DATABASE_URL = "sqlite:///finance.db"
 
 
 class Base(DeclarativeBase):
     """Base class for all database models."""
+
     pass
 
 

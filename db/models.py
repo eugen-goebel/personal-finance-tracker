@@ -7,7 +7,7 @@ SQLAlchemy translates these automatically into SQL CREATE TABLE statements.
 
 from datetime import date, datetime
 
-from sqlalchemy import String, Float, Date, DateTime, Integer, func
+from sqlalchemy import Date, DateTime, Float, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from db.database import Base
@@ -23,7 +23,9 @@ class Transaction(Base):
     description: Mapped[str] = mapped_column(String(255), nullable=False)
     amount: Mapped[float] = mapped_column(Float, nullable=False)
     category: Mapped[str] = mapped_column(String(100), nullable=False, default="Sonstiges")
-    transaction_type: Mapped[str] = mapped_column(String(20), nullable=False)  # "income" or "expense"
+    transaction_type: Mapped[str] = mapped_column(
+        String(20), nullable=False
+    )  # "income" or "expense"
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     def __repr__(self) -> str:

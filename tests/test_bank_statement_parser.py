@@ -3,11 +3,11 @@
 import pytest
 
 from agents.bank_statement_parser import (
+    SUPPORTED_EXTENSIONS,
     BankStatementParser,
-    _get_extension,
     _build_mt940_description,
     _build_ofx_description,
-    SUPPORTED_EXTENSIONS,
+    _get_extension,
 )
 from agents.data_ingestion import TransactionInput
 
@@ -49,7 +49,6 @@ SAMPLE_MT940_EMPTY = b"""\
 
 
 class TestMT940Parsing:
-
     def test_parse_returns_transactions(self, parser):
         result = parser.parse(SAMPLE_MT940, "statement.mt940")
         assert isinstance(result, list)
@@ -151,7 +150,6 @@ NEWFILEUID:NONE
 
 
 class TestOFXParsing:
-
     def test_parse_returns_transactions(self, parser):
         result = parser.parse(SAMPLE_OFX, "statement.ofx")
         assert isinstance(result, list)
@@ -188,8 +186,8 @@ class TestOFXParsing:
 # Format detection and error handling
 # ---------------------------------------------------------------------------
 
-class TestFormatDetection:
 
+class TestFormatDetection:
     def test_unsupported_format_raises(self, parser):
         with pytest.raises(ValueError, match="Unsupported file format"):
             parser.parse(b"some data", "report.pdf")
@@ -218,8 +216,8 @@ class TestFormatDetection:
 # Description builders
 # ---------------------------------------------------------------------------
 
-class TestDescriptionBuilders:
 
+class TestDescriptionBuilders:
     def test_mt940_with_purpose_and_applicant(self):
         data = {"purpose": "Miete", "applicant_name": "Vermieter GmbH"}
         assert _build_mt940_description(data) == "Miete - Vermieter GmbH"
@@ -236,6 +234,7 @@ class TestDescriptionBuilders:
             payee = "REWE"
             memo = "Kartenzahlung"
             type = "debit"
+
         assert _build_ofx_description(MockTxn()) == "REWE - Kartenzahlung"
 
     def test_ofx_fallback(self):
@@ -243,4 +242,5 @@ class TestDescriptionBuilders:
             payee = None
             memo = None
             type = "credit"
+
         assert _build_ofx_description(MockTxn()) == "credit"

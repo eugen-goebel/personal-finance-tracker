@@ -16,9 +16,14 @@ def _add_expenses(db):
         (date(2025, 1, 12), "Netflix", -12.99, "Unterhaltung"),
     ]
     for d, desc, amt, cat in expenses:
-        agent.add_transaction(TransactionInput(
-            date=d, description=desc, amount=amt, category=cat,
-        ))
+        agent.add_transaction(
+            TransactionInput(
+                date=d,
+                description=desc,
+                amount=amt,
+                category=cat,
+            )
+        )
 
 
 class TestBudget:
