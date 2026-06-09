@@ -30,7 +30,7 @@ from db.database import Base, get_engine
 # ---------------------------------------------------------------------------
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "finance.db")
-DB_URL = f"sqlite:///{DB_PATH}"
+DB_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH}")
 engine = get_engine(DB_URL)
 Base.metadata.create_all(bind=engine)
 Session = sessionmaker(bind=engine)

@@ -53,3 +53,28 @@ jobs:
         run: |
           echo "### Coverage" >> "$GITHUB_STEP_SUMMARY"
           python -c "import xml.etree.ElementTree as ET; print(f\"Line coverage: {float(ET.parse('coverage.xml').getroot().get('line-rate'))*100:.1f}%\")" >> "$GITHUB_STEP_SUMMARY"
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build and start the stack
+        run: docker compose up -d --build
+
+      - name: Wait for the API to respond
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/ >/dev/null; then echo "API is up"; exit 0; fi
+            sleep 2
+          done
+          echo "API did not become healthy"
+          docker compose logs
+          exit 1
+
+      - name: Check the dashboard health endpoint
+        run: curl -fsS http://localhost:8501/_stcore/health
+
+      - name: Tear down
+        if: always()
+        run: docker compose down

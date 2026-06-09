@@ -6,10 +6,12 @@ mit Python-Klassen statt mit rohem SQL zu arbeiten. Die Datenbank
 wird als einfache SQLite-Datei gespeichert (kein Server nötig).
 """
 
+import os
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-DATABASE_URL = "sqlite:///finance.db"
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///finance.db")
 
 
 class Base(DeclarativeBase):
