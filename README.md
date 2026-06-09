@@ -111,6 +111,18 @@ The dashboard provides:
 - Transaction management (add, filter, view)
 - CSV import with preview
 
+### Docker
+
+Run the API and the dashboard together with one command:
+
+```bash
+docker compose up
+```
+
+The API is then available on http://localhost:8000 and the dashboard on
+http://localhost:8501. Both services share a single SQLite database stored
+in a named volume, so data added through one is visible in the other.
+
 ## API Endpoints
 
 | Method | Endpoint | Description |
