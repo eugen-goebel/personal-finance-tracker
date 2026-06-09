@@ -6,19 +6,20 @@ and stores transactions in the database.
 """
 
 import io
-from datetime import date, datetime
 from dataclasses import dataclass, field
+from datetime import date
 
 import pandas as pd
 from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 
-from db.models import Transaction
 from agents.categorizer import CategorizerAgent
+from db.models import Transaction
 
 
 class TransactionInput(BaseModel):
     """Validated input for a single transaction."""
+
     date: date
     description: str
     amount: float
@@ -42,6 +43,7 @@ class TransactionInput(BaseModel):
 @dataclass
 class ImportResult:
     """Summary of a CSV import operation."""
+
     total_rows: int = 0
     imported: int = 0
     skipped: int = 0

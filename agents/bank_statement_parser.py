@@ -13,7 +13,6 @@ import ofxparse
 
 from agents.data_ingestion import TransactionInput
 
-
 SUPPORTED_EXTENSIONS = {".sta", ".mt940", ".ofx", ".qfx"}
 
 
@@ -63,17 +62,21 @@ class BankStatementParser:
                     raw_amount = txn.data.get("amount")
                     if raw_amount is None:
                         continue
-                    amount = float(raw_amount.amount if hasattr(raw_amount, "amount") else raw_amount)
+                    amount = float(
+                        raw_amount.amount if hasattr(raw_amount, "amount") else raw_amount
+                    )
                     if amount == 0:
                         continue
 
                     description = _build_mt940_description(txn.data)
 
-                    transactions_out.append(TransactionInput(
-                        date=txn_date_val,
-                        description=description,
-                        amount=round(amount, 2),
-                    ))
+                    transactions_out.append(
+                        TransactionInput(
+                            date=txn_date_val,
+                            description=description,
+                            amount=round(amount, 2),
+                        )
+                    )
 
             return transactions_out
         except Exception as exc:
@@ -98,11 +101,13 @@ class BankStatementParser:
 
                     description = _build_ofx_description(txn)
 
-                    transactions_out.append(TransactionInput(
-                        date=txn_date,
-                        description=description,
-                        amount=round(amount, 2),
-                    ))
+                    transactions_out.append(
+                        TransactionInput(
+                            date=txn_date,
+                            description=description,
+                            amount=round(amount, 2),
+                        )
+                    )
 
             return transactions_out
         except Exception as exc:

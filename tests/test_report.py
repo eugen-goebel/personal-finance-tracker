@@ -3,8 +3,8 @@
 from datetime import date
 
 from agents.analytics import AnalyticsAgent
-from agents.report import ReportAgent
 from agents.data_ingestion import DataIngestionAgent, TransactionInput
+from agents.report import ReportAgent
 
 
 def _seed(db):

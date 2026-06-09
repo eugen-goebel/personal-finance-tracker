@@ -2,7 +2,7 @@
 
 from datetime import date
 
-from agents.alert_service import AlertService, AlertConfig, AlertResult
+from agents.alert_service import AlertConfig, AlertResult, AlertService
 from agents.budget import BudgetAgent
 from agents.data_ingestion import DataIngestionAgent, TransactionInput
 
@@ -17,9 +17,14 @@ def _setup_budgets_and_expenses(db):
         (date(2025, 1, 12), "Netflix", -12.99, "Unterhaltung"),
     ]
     for d, desc, amt, cat in expenses:
-        ingestion.add_transaction(TransactionInput(
-            date=d, description=desc, amount=amt, category=cat,
-        ))
+        ingestion.add_transaction(
+            TransactionInput(
+                date=d,
+                description=desc,
+                amount=amt,
+                category=cat,
+            )
+        )
 
     agent = BudgetAgent(db)
     agent.set_budget("Lebensmittel", 100.00)  # exceeded: 110/100
