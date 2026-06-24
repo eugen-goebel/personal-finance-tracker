@@ -9,4 +9,4 @@ python-multipart>=0.0.32
 mt-940>=4.30.0
 ofxparse>=0.21
 httpx>=0.28.1
-pytest>=8.0.0
+pytest>=9.1.1
