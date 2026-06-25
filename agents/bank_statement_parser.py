@@ -64,9 +64,7 @@ class BankStatementParser:
                 raw_amount = txn.data.get("amount")
                 if raw_amount is None:
                     continue
-                amount = float(
-                    raw_amount.amount if hasattr(raw_amount, "amount") else raw_amount
-                )
+                amount = float(raw_amount.amount if hasattr(raw_amount, "amount") else raw_amount)
                 if amount == 0:
                     continue
 
