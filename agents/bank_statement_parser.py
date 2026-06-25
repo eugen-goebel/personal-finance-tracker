@@ -49,34 +49,36 @@ class BankStatementParser:
         try:
             text = content.decode("utf-8", errors="replace")
             transactions_out = []
-            statements = mt940.parse(io.StringIO(text))
+            # mt940.parse() returns a flat collection that already yields each
+            # Transaction once. Transaction.transactions back-references that
+            # same parent, so looping over it again would emit every row N times.
+            transactions = mt940.parse(io.StringIO(text))
 
-            for statement in statements:
-                for txn in statement.transactions:
-                    txn_date = txn.data.get("date")
-                    if isinstance(txn_date, date):
-                        txn_date_val = txn_date
-                    else:
-                        continue
+            for txn in transactions:
+                txn_date = txn.data.get("date")
+                if isinstance(txn_date, date):
+                    txn_date_val = txn_date
+                else:
+                    continue
 
-                    raw_amount = txn.data.get("amount")
-                    if raw_amount is None:
-                        continue
-                    amount = float(
-                        raw_amount.amount if hasattr(raw_amount, "amount") else raw_amount
+                raw_amount = txn.data.get("amount")
+                if raw_amount is None:
+                    continue
+                amount = float(
+                    raw_amount.amount if hasattr(raw_amount, "amount") else raw_amount
+                )
+                if amount == 0:
+                    continue
+
+                description = _build_mt940_description(txn.data)
+
+                transactions_out.append(
+                    TransactionInput(
+                        date=txn_date_val,
+                        description=description,
+                        amount=round(amount, 2),
                     )
-                    if amount == 0:
-                        continue
-
-                    description = _build_mt940_description(txn.data)
-
-                    transactions_out.append(
-                        TransactionInput(
-                            date=txn_date_val,
-                            description=description,
-                            amount=round(amount, 2),
-                        )
-                    )
+                )
 
             return transactions_out
         except Exception as exc:
