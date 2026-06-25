@@ -52,7 +52,9 @@ class TestMT940Parsing:
     def test_parse_returns_transactions(self, parser):
         result = parser.parse(SAMPLE_MT940, "statement.mt940")
         assert isinstance(result, list)
-        assert len(result) > 0
+        # The sample holds exactly two movements. Asserting the exact count
+        # stops a duplicated-iteration regression from slipping back in.
+        assert len(result) == 2
 
     def test_all_items_are_transaction_input(self, parser):
         result = parser.parse(SAMPLE_MT940, "statement.sta")
