@@ -3,7 +3,7 @@ uvicorn>=0.49.0
 sqlalchemy>=2.0.51
 streamlit>=1.58.0
 pandas>=3.0.3
-numpy>=2.5.0; python_version >= "3.12"
+numpy>=2.5.1; python_version >= "3.12"
 numpy>=2.4.6,<2.5.0; python_version < "3.12"
 pydantic>=2.13.4
 python-multipart>=0.0.32
