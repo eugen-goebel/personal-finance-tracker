@@ -150,7 +150,7 @@ Includes 3 months of realistic transaction data (`data/sample_transactions.csv`)
 pytest tests/ -v
 ```
 
-65 tests covering all agents, the REST API, and edge cases.
+115 tests covering all agents, the REST API, and edge cases.
 
 ## Project Structure
 
