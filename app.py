@@ -119,7 +119,7 @@ if page == "Dashboard":
                         for c in result.category_breakdown
                     ]
                 )
-                st.dataframe(cat_df, use_container_width=True, hide_index=True)
+                st.dataframe(cat_df, width="stretch", hide_index=True)
 
         with col_right:
             budget_agent = BudgetAgent(db)
@@ -142,7 +142,7 @@ if page == "Dashboard":
         if result.top_expenses:
             st.subheader("Top Expenses")
             top_df = pd.DataFrame(result.top_expenses)
-            st.dataframe(top_df, use_container_width=True, hide_index=True)
+            st.dataframe(top_df, width="stretch", hide_index=True)
 
         # Report
         with st.expander("Full Report"):
@@ -230,7 +230,7 @@ elif page == "Transactions":
                     for t in txns
                 ]
             )
-            st.dataframe(df, use_container_width=True, hide_index=True)
+            st.dataframe(df, width="stretch", hide_index=True)
             st.caption(f"{len(txns)} transactions")
         else:
             st.info("No transactions found.")
@@ -449,7 +449,7 @@ elif page == "Import Data":
             # Preview
             with st.expander("Preview"):
                 preview_df = pd.read_csv(io.StringIO(content))
-                st.dataframe(preview_df.head(10), use_container_width=True)
+                st.dataframe(preview_df.head(10), width="stretch")
 
             if st.button("Import"):
                 result = agent.import_csv(content)
@@ -486,7 +486,7 @@ elif page == "Import Data":
                     for t in transactions[:10]
                 ]
                 with st.expander("Preview (first 10)"):
-                    st.dataframe(pd.DataFrame(preview_data), use_container_width=True)
+                    st.dataframe(pd.DataFrame(preview_data), width="stretch")
 
                 if st.button("Import Statement", key="import_statement"):
                     agent = DataIngestionAgent(db)
