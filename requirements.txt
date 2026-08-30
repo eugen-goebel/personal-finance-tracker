@@ -1,3 +1,9 @@
+# Runtime dependencies for the Docker images.
+# pyproject.toml + uv.lock stay the source of truth for local dev and CI.
+# This is the subset the two services need at runtime: the Streamlit
+# dashboard (app.py) and the FastAPI service (api/main.py). mt-940 and
+# ofxparse are needed because the import feature parses bank statements
+# in those formats.
 fastapi>=0.141.1
 uvicorn>=0.52.4
 sqlalchemy>=2.0.52
@@ -9,5 +15,3 @@ pydantic>=2.13.4
 python-multipart>=0.0.32
 mt-940>=5.0.0
 ofxparse>=0.21
-httpx>=0.28.1
-pytest>=9.1.1
