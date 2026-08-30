@@ -1,3 +1,31 @@
+[project]
+name = "personal-finance-tracker"
+version = "1.0.0"
+description = "Personal finance tracking with a Streamlit dashboard, a FastAPI service and MT940 or OFX statement import"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.141.1",
+    "uvicorn>=0.52.4",
+    "sqlalchemy>=2.0.52",
+    "streamlit>=1.62.0",
+    "pandas>=3.0.5",
+    "numpy>=2.5.2; python_version >= '3.12'",
+    "numpy>=2.4.6,<2.5.0; python_version < '3.12'",
+    "pydantic>=2.13.4",
+    "python-multipart>=0.0.32",
+    "mt-940>=5.0.0",
+    "ofxparse>=0.21",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.16.4",
+    # fastapi.testclient builds on httpx, only the test suite needs it
+    "httpx>=0.28.1",
+]
+
 [tool.ruff]
 line-length = 100
 target-version = "py310"
