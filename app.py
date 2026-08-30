@@ -14,16 +14,21 @@ from datetime import date
 
 import pandas as pd
 import streamlit as st
+from dotenv import load_dotenv
 from sqlalchemy.orm import sessionmaker
 
-from agents.analytics import AnalyticsAgent
-from agents.bank_statement_parser import BankStatementParser
-from agents.budget import BudgetAgent
-from agents.categorizer import CategorizerAgent
-from agents.data_ingestion import DataIngestionAgent
-from agents.report import ReportAgent
-from agents.savings_goals import SavingsGoalsAgent
-from db.database import Base, get_engine
+# Load .env before the agent imports below, so anything reading configuration
+# at import time sees the file. Real environment variables still win.
+load_dotenv()
+
+from agents.analytics import AnalyticsAgent  # noqa: E402
+from agents.bank_statement_parser import BankStatementParser  # noqa: E402
+from agents.budget import BudgetAgent  # noqa: E402
+from agents.categorizer import CategorizerAgent  # noqa: E402
+from agents.data_ingestion import DataIngestionAgent  # noqa: E402
+from agents.report import ReportAgent  # noqa: E402
+from agents.savings_goals import SavingsGoalsAgent  # noqa: E402
+from db.database import Base, get_engine  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Database setup

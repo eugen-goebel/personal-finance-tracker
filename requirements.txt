@@ -3,7 +3,7 @@
 # This is the subset the two services need at runtime: the Streamlit
 # dashboard (app.py) and the FastAPI service (api/main.py). mt-940 and
 # ofxparse are needed because the import feature parses bank statements
-# in those formats.
+# in those formats, python-dotenv loads the .env file.
 fastapi>=0.141.1
 uvicorn>=0.52.4
 sqlalchemy>=2.0.52
@@ -13,5 +13,6 @@ numpy>=2.5.2; python_version >= "3.12"
 numpy>=2.4.6,<2.5.0; python_version < "3.12"
 pydantic>=2.13.4
 python-multipart>=0.0.32
+python-dotenv>=1.2.3
 mt-940>=5.0.0
 ofxparse>=0.21

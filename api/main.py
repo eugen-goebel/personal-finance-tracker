@@ -10,10 +10,16 @@ To run:
 
 from contextlib import asynccontextmanager
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 
-from api.routes import analytics, budgets, savings_goals, transactions
-from db.database import init_db
+# Load .env before the imports below, so db.database sees DATABASE_URL when it
+# reads it at module level. Real environment variables still win, which is how
+# docker-compose passes the database location.
+load_dotenv()
+
+from api.routes import analytics, budgets, savings_goals, transactions  # noqa: E402
+from db.database import init_db  # noqa: E402
 
 
 @asynccontextmanager
