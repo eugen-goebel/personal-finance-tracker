@@ -24,7 +24,7 @@ load_dotenv()
 from agents.analytics import AnalyticsAgent  # noqa: E402
 from agents.bank_statement_parser import BankStatementParser  # noqa: E402
 from agents.budget import BudgetAgent  # noqa: E402
-from agents.categorizer import CategorizerAgent  # noqa: E402
+from agents.categorizer import INCOME_CATEGORIES, CategorizerAgent  # noqa: E402
 from agents.data_ingestion import DataIngestionAgent  # noqa: E402
 from agents.report import ReportAgent  # noqa: E402
 from agents.savings_goals import SavingsGoalsAgent  # noqa: E402
@@ -43,6 +43,25 @@ Session = sessionmaker(bind=engine)
 
 def get_session():
     return Session()
+
+
+# ---------------------------------------------------------------------------
+# Money formatting
+# ---------------------------------------------------------------------------
+
+# The dashboard and the budget page rendered bare numbers ("10,550.00"),
+# while the savings goals page already prefixed a euro sign. Same app, two
+# conventions, and on the dashboard nothing distinguished an amount from a
+# count. The sample data is unambiguously euro (German categories, "REWE
+# Supermarkt"), so the currency lives in one constant now.
+CURRENCY = "EUR"
+CURRENCY_SYMBOL = "€"
+
+
+def money(value: float, signed: bool = False) -> str:
+    """Format an amount with its currency symbol."""
+    formatted = f"{value:+,.2f}" if signed else f"{value:,.2f}"
+    return f"{formatted} {CURRENCY_SYMBOL}"
 
 
 # ---------------------------------------------------------------------------
@@ -89,9 +108,9 @@ if page == "Dashboard":
 
         # Key metrics
         col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Total Income", f"{result.total_income:,.2f}")
-        col2.metric("Total Expenses", f"{result.total_expenses:,.2f}")
-        col3.metric("Net Balance", f"{result.net_balance:,.2f}")
+        col1.metric("Total Income", money(result.total_income))
+        col2.metric("Total Expenses", money(result.total_expenses))
+        col3.metric("Net Balance", money(result.net_balance))
         col4.metric("Savings Rate", f"{result.savings_rate:.1f}%")
 
         st.divider()
@@ -118,7 +137,7 @@ if page == "Dashboard":
                     [
                         {
                             "Category": c.category,
-                            "Amount": c.total,
+                            "Amount": money(c.total),
                             "Percent": f"{c.percentage:.1f}%",
                         }
                         for c in result.category_breakdown
@@ -128,16 +147,39 @@ if page == "Dashboard":
 
         with col_right:
             budget_agent = BudgetAgent(db)
-            today = date.today()
-            overview = budget_agent.get_status(today.year, today.month)
+            # Budgets are monthly, but the dashboard asked for the current
+            # calendar month while the sample data ends in March 2025. That
+            # showed every budget at 0.00 spent, which reads like a bug in the
+            # tracking rather than an empty month. Anchor the check on the
+            # newest month that actually holds transactions instead.
+            if result.trends:
+                latest = result.trends[-1]
+                year, month, budget_month = latest.year, latest.month, latest.label
+            else:
+                today = date.today()
+                year, month = today.year, today.month
+                budget_month = f"{year}-{month:02d}"
+            overview = budget_agent.get_status(year, month)
             if overview.budgets:
                 st.subheader("Budget Status")
+                st.caption(f"Spending in {budget_month}.")
                 for b in overview.budgets:
                     color = (
                         "🔴" if b.status == "exceeded" else "🟡" if b.status == "warning" else "🟢"
                     )
-                    st.write(f"{color} **{b.category}**: {b.spent:.2f} / {b.monthly_limit:.2f}")
+                    st.write(
+                        f"{color} **{b.category}**: {money(b.spent)} / {money(b.monthly_limit)}"
+                    )
                     st.progress(min(b.percentage_used / 100, 1.0))
+                    # An older build let a budget be set on an income category.
+                    # Such an entry can only ever read 0.00 spent, so say why
+                    # rather than leave it looking like broken tracking.
+                    if b.category in INCOME_CATEGORIES:
+                        st.caption(
+                            f"{b.category} is an income category, so no spending is "
+                            "tracked against it. You can delete this budget on the "
+                            "Budgets page."
+                        )
 
                 if overview.warnings:
                     for w in overview.warnings:
@@ -147,6 +189,8 @@ if page == "Dashboard":
         if result.top_expenses:
             st.subheader("Top Expenses")
             top_df = pd.DataFrame(result.top_expenses)
+            if "amount" in top_df.columns:
+                top_df["amount"] = top_df["amount"].map(money)
             st.dataframe(top_df, width="stretch", hide_index=True)
 
         # Report
@@ -198,7 +242,9 @@ elif page == "Transactions":
                         category=cat,
                     )
                     txn = agent.add_transaction(txn_input)
-                    st.success(f"Added: {txn.description} ({txn.amount:+.2f}) → {txn.category}")
+                    st.success(
+                        f"Added: {txn.description} ({money(txn.amount, signed=True)}) → {txn.category}"
+                    )
                 finally:
                     db.close()
 
@@ -228,7 +274,7 @@ elif page == "Transactions":
                         "ID": t.id,
                         "Date": str(t.date),
                         "Description": t.description,
-                        "Amount": f"{t.amount:+,.2f}",
+                        "Amount": money(t.amount, signed=True),
                         "Category": t.category,
                         "Type": t.transaction_type,
                     }
@@ -255,7 +301,7 @@ elif page == "Budgets":
         col1, col2 = st.columns(2)
         with col1:
             categorizer = CategorizerAgent()
-            budget_cat = st.selectbox("Category", categorizer.available_categories)
+            budget_cat = st.selectbox("Category", categorizer.expense_categories)
         with col2:
             limit = st.number_input("Monthly Limit", min_value=1.0, step=10.0, value=200.0)
 
@@ -264,7 +310,7 @@ elif page == "Budgets":
             try:
                 agent = BudgetAgent(db)
                 agent.set_budget(budget_cat, limit)
-                st.success(f"Budget set: {budget_cat} = {limit:.2f}/month")
+                st.success(f"Budget set: {budget_cat} = {money(limit)}/month")
             finally:
                 db.close()
 
@@ -294,9 +340,9 @@ elif page == "Budgets":
                     st.write(f"{color} **{b.category}**")
                     st.progress(min(b.percentage_used / 100, 1.0))
                 with col2:
-                    st.metric("Spent", f"{b.spent:.2f}")
+                    st.metric("Spent", money(b.spent))
                 with col3:
-                    st.metric("Limit", f"{b.monthly_limit:.2f}")
+                    st.metric("Limit", money(b.monthly_limit))
 
             if overview.warnings:
                 st.divider()
@@ -368,9 +414,14 @@ elif page == "Savings Goals":
 
                     st.progress(min(progress.progress_pct / 100, 1.0))
                     metric_cols = st.columns(4)
-                    metric_cols[0].metric("Target", f"€{goal.target_amount:,.0f}")
-                    metric_cols[1].metric("Saved", f"€{goal.current_amount:,.0f}")
-                    metric_cols[2].metric("Remaining", f"€{progress.remaining_amount:,.0f}")
+                    # Rounded to whole euro here: goal amounts are targets, not
+                    # ledger entries, and the cents add noise. The symbol side
+                    # matches the rest of the app.
+                    metric_cols[0].metric("Target", f"{goal.target_amount:,.0f} {CURRENCY_SYMBOL}")
+                    metric_cols[1].metric("Saved", f"{goal.current_amount:,.0f} {CURRENCY_SYMBOL}")
+                    metric_cols[2].metric(
+                        "Remaining", f"{progress.remaining_amount:,.0f} {CURRENCY_SYMBOL}"
+                    )
                     if progress.days_left is not None:
                         days_label = (
                             f"{progress.days_left} days"
@@ -380,7 +431,8 @@ elif page == "Savings Goals":
                         metric_cols[3].metric("Time", days_label)
                     elif progress.monthly_contribution_needed is not None:
                         metric_cols[3].metric(
-                            "Monthly", f"€{progress.monthly_contribution_needed:,.0f}"
+                            "Monthly",
+                            f"{progress.monthly_contribution_needed:,.0f} {CURRENCY_SYMBOL}",
                         )
 
                     if (
@@ -390,7 +442,7 @@ elif page == "Savings Goals":
                     ):
                         st.caption(
                             f"To hit the target on time you need to save about "
-                            f"€{progress.monthly_contribution_needed:,.0f} / month."
+                            f"{progress.monthly_contribution_needed:,.0f} {CURRENCY_SYMBOL} / month."
                         )
 
                     with st.expander("💰 Add contribution"):

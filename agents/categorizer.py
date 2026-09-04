@@ -7,6 +7,11 @@ No API key needed — pure Python logic.
 
 from dataclasses import dataclass
 
+# Categories that describe money coming in rather than going out. A monthly
+# budget caps spending, so it cannot meaningfully apply to these: a budget on
+# "Gehalt" can only ever read 0.00 spent.
+INCOME_CATEGORIES: frozenset[str] = frozenset({"Gehalt"})
+
 # Keyword-to-category mapping (German + English terms)
 CATEGORY_KEYWORDS: dict[str, list[str]] = {
     "Gehalt": [
@@ -223,3 +228,13 @@ class CategorizerAgent:
     def available_categories(self) -> list[str]:
         """Return all known categories."""
         return sorted(self.rules.keys()) + ["Sonstiges"]
+
+    @property
+    def expense_categories(self) -> list[str]:
+        """Categories that can hold expenses, so budgets can apply to them.
+
+        A budget caps monthly spending. Offering it on an income category
+        produces an entry that can never be filled: the budget page showed
+        "Gehalt: 0.00 / 200.00" because salary only ever arrives as income.
+        """
+        return [c for c in self.available_categories if c not in INCOME_CATEGORIES]
