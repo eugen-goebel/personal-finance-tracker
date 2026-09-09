@@ -14,5 +14,5 @@ numpy>=2.4.6,<2.5.0; python_version < "3.12"
 pydantic>=2.13.4
 python-multipart>=0.0.32
 python-dotenv>=1.2.3
-mt-940>=5.0.0
+mt-940>=5.1.0
 ofxparse>=0.21
