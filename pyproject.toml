@@ -5,7 +5,7 @@ description = "Personal finance tracking with a Streamlit dashboard, a FastAPI s
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.141.1",
-    "uvicorn>=0.52.4",
+    "uvicorn>=0.53.0",
     "sqlalchemy>=2.0.54",
     "streamlit>=1.63.0",
     "pandas>=3.0.6",
