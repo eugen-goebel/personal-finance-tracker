@@ -5,7 +5,7 @@
 # ofxparse are needed because the import feature parses bank statements
 # in those formats, python-dotenv loads the .env file.
 fastapi>=0.141.1
-uvicorn>=0.52.4
+uvicorn>=0.53.0
 sqlalchemy>=2.0.54
 streamlit>=1.63.0
 pandas>=3.0.6
