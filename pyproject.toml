@@ -7,7 +7,7 @@ dependencies = [
     "fastapi>=0.141.1",
     "uvicorn>=0.53.0",
     "sqlalchemy>=2.0.54",
-    "streamlit>=1.63.0",
+    "streamlit>=1.64.0",
     "pandas>=3.0.6",
     "numpy>=2.5.2; python_version >= '3.12'",
     "numpy>=2.4.6,<2.5.0; python_version < '3.12'",
