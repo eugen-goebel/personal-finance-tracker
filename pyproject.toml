@@ -4,7 +4,7 @@ version = "1.0.0"
 description = "Personal finance tracking with a Streamlit dashboard, a FastAPI service and MT940 or OFX statement import"
 requires-python = ">=3.11"
 dependencies = [
-    "fastapi>=0.141.1",
+    "fastapi>=0.142.2",
     "uvicorn>=0.54.0",
     "sqlalchemy>=2.1.1",
     "streamlit>=1.64.0",
