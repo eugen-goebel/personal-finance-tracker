@@ -11,7 +11,7 @@ streamlit>=1.66.1
 pandas>=3.1.0
 numpy>=2.5.2; python_version >= "3.12"
 numpy>=2.4.6,<2.5.0; python_version < "3.12"
-pydantic>=2.14.1
+pydantic>=2.14.2
 python-multipart>=0.0.33
 python-dotenv>=1.2.4
 mt-940>=5.1.3
