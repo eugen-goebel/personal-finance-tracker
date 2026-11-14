@@ -156,3 +156,44 @@ class TestBudgetCategories:
         assert not at.exception
         captions = " ".join(c.value for c in at.caption)
         assert "income category" in captions
+
+
+class TestStatementUploadErrors:
+    """The dashboard must not show parser/library exception text to the user."""
+
+    SECRET = "secret-internal-marker /srv/app/lib/parser.py offset 4711"
+
+    @staticmethod
+    def _open_import_page(app):
+        app.sidebar.radio[0].set_value("Import Data").run()
+        # Two uploaders on this page: CSV first, bank statement second.
+        return app.file_uploader[1]
+
+    @staticmethod
+    def _error_text(app):
+        return " ".join(e.value for e in app.error)
+
+    @pytest.mark.parametrize(
+        ("filename", "target", "fmt"),
+        [
+            ("bad.mt940", "agents.bank_statement_parser.mt940.parse", "MT940"),
+            ("bad.ofx", "agents.bank_statement_parser.ofxparse.OfxParser.parse", "OFX"),
+        ],
+    )
+    def test_parser_error_is_not_shown(self, app, monkeypatch, caplog, filename, target, fmt):
+        def failing_parse(*args, **kwargs):
+            raise ValueError(self.SECRET)
+
+        monkeypatch.setattr(target, failing_parse)
+        uploader = self._open_import_page(app)
+        uploader.set_value((filename, b"irrelevant", "application/octet-stream"))
+
+        with caplog.at_level("ERROR"):
+            app.run()
+
+        assert not app.exception
+        shown = self._error_text(app)
+        assert f"Failed to parse {fmt} file" in shown
+        assert "secret-internal-marker" not in shown
+        assert "4711" not in shown
+        assert self.SECRET in caplog.text

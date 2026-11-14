@@ -289,3 +289,86 @@ class TestBudgetAlertsErrorHandling:
         assert "smtp.internal.corp" not in resp.text
         # ... and the detail is logged server-side.
         assert self.SECRET in caplog.text
+
+
+class TestStatementImportErrorHandling:
+    """The statement upload must not leak parser/library exception text."""
+
+    SECRET = "secret-internal-marker /srv/app/lib/parser.py offset 4711 IBAN DE00123456789"
+
+    @staticmethod
+    def _upload(client, name, content=b"irrelevant"):
+        return client.post(
+            "/api/transactions/import-statement",
+            files={"file": (name, content, "application/octet-stream")},
+        )
+
+    def test_mt940_library_error_is_not_exposed(self, client, monkeypatch, caplog):
+        def failing_parse(*args, **kwargs):
+            raise ValueError(self.SECRET)
+
+        monkeypatch.setattr("agents.bank_statement_parser.mt940.parse", failing_parse)
+
+        with caplog.at_level("ERROR"):
+            resp = self._upload(client, "bad.mt940")
+
+        # Status code unchanged, client sees a fixed message naming the format ...
+        assert resp.status_code == 400
+        assert resp.json()["detail"].startswith("Failed to parse MT940 file")
+        # ... without the library text ...
+        assert "secret-internal-marker" not in resp.text
+        assert "4711" not in resp.text
+        # ... which is logged server-side instead.
+        assert self.SECRET in caplog.text
+
+    def test_ofx_library_error_is_not_exposed(self, client, monkeypatch, caplog):
+        def failing_parse(*args, **kwargs):
+            raise ValueError(self.SECRET)
+
+        monkeypatch.setattr("agents.bank_statement_parser.ofxparse.OfxParser.parse", failing_parse)
+
+        with caplog.at_level("ERROR"):
+            resp = self._upload(client, "bad.ofx")
+
+        assert resp.status_code == 400
+        assert resp.json()["detail"].startswith("Failed to parse OFX file")
+        assert "secret-internal-marker" not in resp.text
+        assert "4711" not in resp.text
+        assert self.SECRET in caplog.text
+
+    def test_genuinely_malformed_ofx_gets_fixed_message(self, client):
+        resp = self._upload(client, "garbage.ofx", b"not valid ofx data")
+        assert resp.status_code == 400
+        assert resp.json()["detail"].startswith("Failed to parse OFX file")
+
+    def test_unsupported_format_message_is_unchanged(self, client):
+        resp = self._upload(client, "report.pdf")
+        assert resp.status_code == 400
+        assert resp.json()["detail"] == "Unsupported format. Supported: .mt940, .ofx, .qfx, .sta"
+
+    def test_per_transaction_failure_is_not_exposed(self, client, monkeypatch, caplog):
+        def failing_add(self_, txn_input):
+            raise RuntimeError(self.SECRET)
+
+        monkeypatch.setattr("agents.data_ingestion.DataIngestionAgent.add_transaction", failing_add)
+        ofx = (
+            b"OFXHEADER:100\nDATA:OFXSGML\nVERSION:102\nSECURITY:NONE\nENCODING:USASCII\n"
+            b"CHARSET:1252\nCOMPRESSION:NONE\nOLDFILEUID:NONE\nNEWFILEUID:NONE\n\n"
+            b"<OFX><BANKMSGSRSV1><STMTTRNRS><STMTRS><CURDEF>EUR"
+            b"<BANKACCTFROM><BANKID>1<ACCTID>1<ACCTTYPE>CHECKING</BANKACCTFROM>"
+            b"<BANKTRANLIST><STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20250115"
+            b"<TRNAMT>-10.00<FITID>1<NAME>REWE</STMTTRN></BANKTRANLIST>"
+            b"</STMTRS></STMTTRNRS></BANKMSGSRSV1></OFX>"
+        )
+
+        with caplog.at_level("ERROR"):
+            resp = self._upload(client, "ok.ofx", ofx)
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["total_rows"] == 1
+        assert body["imported"] == 0
+        assert len(body["errors"]) == 1
+        assert body["errors"][0].startswith("Transaction 1:")
+        assert "secret-internal-marker" not in resp.text
+        assert self.SECRET in caplog.text
