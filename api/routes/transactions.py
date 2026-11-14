@@ -1,5 +1,6 @@
 """Transaction API routes — CRUD operations for financial transactions."""
 
+import logging
 from datetime import date
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -9,6 +10,8 @@ from agents.bank_statement_parser import SUPPORTED_EXTENSIONS, BankStatementPars
 from agents.data_ingestion import DataIngestionAgent, TransactionInput
 from api.schemas import ImportResponse, MessageResponse, TransactionCreate, TransactionResponse
 from db.database import get_db
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/transactions", tags=["Transactions"])
 
@@ -106,8 +109,9 @@ async def import_bank_statement(file: UploadFile = File(...), db: Session = Depe
         try:
             agent.add_transaction(txn_input)
             imported += 1
-        except Exception as exc:
-            errors.append(f"Transaction {i}: {exc}")
+        except Exception:
+            logger.exception("Failed to import statement transaction %d", i)
+            errors.append(f"Transaction {i}: could not be saved")
 
     return ImportResponse(
         total_rows=len(transactions),

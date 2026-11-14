@@ -5,6 +5,7 @@ import pytest
 from agents.bank_statement_parser import (
     SUPPORTED_EXTENSIONS,
     BankStatementParser,
+    StatementParseError,
     _build_mt940_description,
     _build_ofx_description,
     _get_extension,
@@ -212,6 +213,20 @@ class TestFormatDetection:
     def test_invalid_ofx_raises(self, parser):
         with pytest.raises(ValueError, match="Failed to parse OFX"):
             parser.parse(b"not valid ofx data", "bad.ofx")
+
+    def test_library_error_text_is_kept_out_of_the_message(self, parser, monkeypatch):
+        def failing_parse(*args, **kwargs):
+            raise RuntimeError("secret-internal-marker")
+
+        monkeypatch.setattr("agents.bank_statement_parser.mt940.parse", failing_parse)
+        with pytest.raises(StatementParseError) as excinfo:
+            parser.parse(b"x", "bad.mt940")
+
+        # Still a ValueError for existing callers, original kept as the cause.
+        assert isinstance(excinfo.value, ValueError)
+        assert "secret-internal-marker" not in str(excinfo.value)
+        assert "MT940" in str(excinfo.value)
+        assert isinstance(excinfo.value.__cause__, RuntimeError)
 
 
 # ---------------------------------------------------------------------------

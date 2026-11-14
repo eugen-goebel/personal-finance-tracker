@@ -9,6 +9,7 @@ To run:
 """
 
 import io
+import logging
 import os
 from datetime import date
 
@@ -29,6 +30,8 @@ from agents.data_ingestion import DataIngestionAgent  # noqa: E402
 from agents.report import ReportAgent  # noqa: E402
 from agents.savings_goals import SavingsGoalsAgent  # noqa: E402
 from db.database import Base, get_engine  # noqa: E402
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Database setup
@@ -553,14 +556,15 @@ elif page == "Import Data":
                         try:
                             agent.add_transaction(txn_input)
                             imported += 1
-                        except Exception as exc:
-                            errors.append(f"Transaction {i}: {exc}")
+                        except Exception:
+                            logger.exception("Failed to import statement transaction %d", i)
+                            errors.append(f"Transaction {i}: could not be saved")
 
                     st.success(f"Imported {imported} of {len(transactions)} transactions")
                     if errors:
                         for e in errors:
                             st.error(e)
         except ValueError as exc:
-            st.error(f"Failed to parse statement: {exc}")
+            st.error(str(exc))
         finally:
             db.close()

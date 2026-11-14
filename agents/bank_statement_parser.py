@@ -6,6 +6,7 @@ objects ready for import via the DataIngestionAgent.
 """
 
 import io
+import logging
 from datetime import date
 
 import mt940
@@ -13,7 +14,23 @@ import ofxparse
 
 from agents.data_ingestion import TransactionInput
 
+logger = logging.getLogger(__name__)
+
 SUPPORTED_EXTENSIONS = {".sta", ".mt940", ".ofx", ".qfx"}
+
+
+class StatementParseError(ValueError):
+    """A statement file could not be read by the underlying parser library.
+
+    The message is fixed and safe to show to users: it names the format but
+    carries no library text (offsets, file fragments, tracebacks). The original
+    exception is logged by the parser and kept as ``__cause__``.
+    """
+
+    def __init__(self, fmt: str):
+        super().__init__(
+            f"Failed to parse {fmt} file: the file could not be read as a valid {fmt} statement"
+        )
 
 
 class BankStatementParser:
@@ -30,7 +47,8 @@ class BankStatementParser:
             List of TransactionInput objects
 
         Raises:
-            ValueError: If the file format is not supported or parsing fails
+            ValueError: If the file format is not supported
+            StatementParseError: (a ValueError) If the file cannot be parsed
         """
         ext = _get_extension(filename)
 
@@ -80,7 +98,8 @@ class BankStatementParser:
 
             return transactions_out
         except Exception as exc:
-            raise ValueError(f"Failed to parse MT940 file: {exc}") from exc
+            logger.exception("Failed to parse MT940 file")
+            raise StatementParseError("MT940") from exc
 
     def _parse_ofx(self, content: bytes) -> list[TransactionInput]:
         """Parse OFX/QFX bank statement format."""
@@ -111,7 +130,8 @@ class BankStatementParser:
 
             return transactions_out
         except Exception as exc:
-            raise ValueError(f"Failed to parse OFX file: {exc}") from exc
+            logger.exception("Failed to parse OFX file")
+            raise StatementParseError("OFX") from exc
 
 
 def _get_extension(filename: str) -> str:
