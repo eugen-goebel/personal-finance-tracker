@@ -504,19 +504,30 @@ elif page == "Import Data":
         db = get_session()
         try:
             agent = DataIngestionAgent(db)
-            content = uploaded.read().decode("utf-8")
+            try:
+                content = uploaded.read().decode("utf-8")
+            except UnicodeDecodeError:
+                logger.exception("Uploaded CSV is not valid UTF-8")
+                content = None
+                st.error("Failed to read CSV: the file is not valid UTF-8 text")
 
-            # Preview
-            with st.expander("Preview"):
-                preview_df = pd.read_csv(io.StringIO(content))
-                st.dataframe(preview_df.head(10), width="stretch")
+            if content is not None:
+                # Preview
+                with st.expander("Preview"):
+                    try:
+                        preview_df = pd.read_csv(io.StringIO(content))
+                    except Exception:
+                        logger.exception("Failed to build CSV preview")
+                        st.error("Failed to parse CSV: the file could not be read as CSV")
+                    else:
+                        st.dataframe(preview_df.head(10), width="stretch")
 
-            if st.button("Import"):
-                result = agent.import_csv(content)
-                st.success(f"Imported {result.imported} of {result.total_rows} transactions")
-                if result.errors:
-                    for e in result.errors:
-                        st.error(e)
+                if st.button("Import"):
+                    result = agent.import_csv(content)
+                    st.success(f"Imported {result.imported} of {result.total_rows} transactions")
+                    if result.errors:
+                        for e in result.errors:
+                            st.error(e)
         finally:
             db.close()
 

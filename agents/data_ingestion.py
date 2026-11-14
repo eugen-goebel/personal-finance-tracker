@@ -6,15 +6,18 @@ and stores transactions in the database.
 """
 
 import io
+import logging
 from dataclasses import dataclass, field
 from datetime import date
 
 import pandas as pd
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ValidationError, field_validator
 from sqlalchemy.orm import Session
 
 from agents.categorizer import CategorizerAgent
 from db.models import Transaction
+
+logger = logging.getLogger(__name__)
 
 
 class TransactionInput(BaseModel):
@@ -38,6 +41,20 @@ class TransactionInput(BaseModel):
         if v == 0:
             raise ValueError("Amount must not be zero")
         return round(v, 2)
+
+
+def _describe_validation_error(exc: ValidationError) -> str:
+    """Summarise a validation error as "field: rule" without pydantic's wrapper.
+
+    str(ValidationError) carries the model name, the rejected input value and a
+    docs URL. Only the field name and the message are kept.
+    """
+    parts = []
+    for err in exc.errors(include_url=False, include_context=False, include_input=False):
+        field_name = ".".join(str(p) for p in err["loc"])
+        message = err["msg"].removeprefix("Value error, ")
+        parts.append(f"{field_name}: {message}" if field_name else message)
+    return "; ".join(parts)
 
 
 @dataclass
@@ -81,6 +98,11 @@ class DataIngestionAgent:
         self.db.refresh(txn)
         return txn
 
+    @staticmethod
+    def _skip(result: ImportResult, message: str) -> None:
+        result.skipped += 1
+        result.errors.append(message)
+
     def import_csv(self, file_content: str | bytes) -> ImportResult:
         """Import transactions from CSV content.
 
@@ -94,8 +116,11 @@ class DataIngestionAgent:
 
         try:
             df = pd.read_csv(io.StringIO(file_content))
-        except Exception as e:
-            result.errors.append(f"Failed to parse CSV: {e}")
+        except Exception:
+            # pandas' message can quote file content and parser internals, so it
+            # goes to the server log only; the caller gets a fixed message.
+            logger.exception("Failed to parse CSV")
+            result.errors.append("Failed to parse CSV: the file could not be read as CSV")
             return result
 
         # Normalize column names
@@ -111,30 +136,49 @@ class DataIngestionAgent:
         result.total_rows = len(df)
 
         for idx, row in df.iterrows():
+            row_no = idx + 1
+
+            # Messages written by this project (validation rules) are returned as
+            # they are. Anything raised by pandas, pydantic's wrapper or the
+            # database is logged and replaced by a fixed message.
             try:
-                # Parse date
                 txn_date = pd.to_datetime(row["date"]).date()
+            except Exception:
+                logger.warning("CSV row %d: invalid date", row_no, exc_info=True)
+                self._skip(result, f"Row {row_no}: invalid date")
+                continue
 
-                # Parse amount
+            try:
                 amount = float(str(row["amount"]).replace(",", "."))
+            except Exception:
+                logger.warning("CSV row %d: invalid amount", row_no, exc_info=True)
+                self._skip(result, f"Row {row_no}: invalid amount")
+                continue
 
-                # Get category
-                category = None
-                if "category" in df.columns and pd.notna(row.get("category")):
-                    category = str(row["category"]).strip()
+            category = None
+            if "category" in df.columns and pd.notna(row.get("category")):
+                category = str(row["category"]).strip()
 
+            try:
                 txn_input = TransactionInput(
                     date=txn_date,
                     description=str(row["description"]),
                     amount=amount,
                     category=category if category else None,
                 )
-                self.add_transaction(txn_input)
-                result.imported += 1
+            except ValidationError as exc:
+                logger.warning("CSV row %d failed validation", row_no, exc_info=True)
+                self._skip(result, f"Row {row_no}: {_describe_validation_error(exc)}")
+                continue
 
-            except Exception as e:
-                result.skipped += 1
-                result.errors.append(f"Row {idx + 1}: {e}")
+            try:
+                self.add_transaction(txn_input)
+            except Exception:
+                logger.exception("Failed to save CSV row %d", row_no)
+                self._skip(result, f"Row {row_no}: could not be saved")
+                continue
+
+            result.imported += 1
 
         return result
 

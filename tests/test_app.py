@@ -197,3 +197,102 @@ class TestStatementUploadErrors:
         assert "secret-internal-marker" not in shown
         assert "4711" not in shown
         assert self.SECRET in caplog.text
+
+
+class TestCsvUploadErrors:
+    """The dashboard must not show pandas/library exception text for CSV uploads."""
+
+    SECRET = "secret-internal-marker /srv/app/lib/parser.py offset 4711"
+    UNREADABLE = "Failed to parse CSV: the file could not be read as CSV"
+
+    @staticmethod
+    def _open_import_page(app):
+        app.sidebar.radio[0].set_value("Import Data").run()
+        # Two uploaders on this page: CSV first, bank statement second.
+        return app.file_uploader[0]
+
+    @staticmethod
+    def _error_text(app):
+        return " ".join(e.value for e in app.error)
+
+    @staticmethod
+    def _click_import(app):
+        next(b for b in app.button if b.label == "Import").click().run()
+
+    def test_csv_parser_error_is_not_shown(self, app, monkeypatch, caplog):
+        def failing_read_csv(*args, **kwargs):
+            raise ValueError(self.SECRET)
+
+        monkeypatch.setattr("pandas.read_csv", failing_read_csv)
+        uploader = self._open_import_page(app)
+        uploader.set_value(("bad.csv", b"date,description,amount\n", "text/csv"))
+
+        with caplog.at_level("ERROR"):
+            app.run()
+            # The preview must not crash the page ...
+            assert not app.exception
+            self._click_import(app)
+
+        # ... and neither the preview nor the import shows the library text.
+        assert not app.exception
+        shown = self._error_text(app)
+        assert self.UNREADABLE in shown
+        assert "secret-internal-marker" not in shown
+        assert "4711" not in shown
+        assert self.SECRET in caplog.text
+
+    def test_unreadable_csv_shows_fixed_message(self, app):
+        uploader = self._open_import_page(app)
+        uploader.set_value(("empty.csv", b"", "text/csv"))
+        app.run()
+        assert not app.exception
+        self._click_import(app)
+        assert not app.exception
+        shown = self._error_text(app)
+        assert self.UNREADABLE in shown
+        assert "No columns to parse" not in shown
+
+    def test_non_utf8_csv_does_not_crash_the_page(self, app, caplog):
+        uploader = self._open_import_page(app)
+        uploader.set_value(
+            ("latin1.csv", b"date,description,amount\n2025-01-01,Caf\xe9,5\n", "text/csv")
+        )
+
+        with caplog.at_level("ERROR"):
+            app.run()
+
+        assert not app.exception
+        shown = self._error_text(app)
+        assert "Failed to read CSV: the file is not valid UTF-8 text" in shown
+        assert "codec" not in shown
+        assert "0xe9" not in shown
+
+    def test_row_errors_are_shown_without_library_text(self, app):
+        uploader = self._open_import_page(app)
+        content = b"date,description,amount\nnot-a-date,A,5\n2025-01-02,B,abc\n2025-01-03,C,0\n"
+        uploader.set_value(("rows.csv", content, "text/csv"))
+        app.run()
+        self._click_import(app)
+
+        assert not app.exception
+        shown = self._error_text(app)
+        assert "Row 1: invalid date" in shown
+        assert "Row 2: invalid amount" in shown
+        # The project's own validation rule is named by field and constraint.
+        assert "Row 3: amount: Amount must not be zero" in shown
+        for fragment in (
+            "Unknown datetime",
+            "could not convert",
+            "validation error for",
+            "pydantic",
+        ):
+            assert fragment not in shown
+
+    def test_missing_columns_message_is_unchanged(self, app):
+        uploader = self._open_import_page(app)
+        uploader.set_value(("nocols.csv", b"date,amount\n2025-01-01,5\n", "text/csv"))
+        app.run()
+        self._click_import(app)
+
+        assert not app.exception
+        assert "Missing columns: description" in self._error_text(app)
