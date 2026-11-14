@@ -9,6 +9,7 @@ Supports SMTP configuration via environment variables:
   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, ALERT_RECIPIENT
 """
 
+import logging
 import os
 import smtplib
 from dataclasses import dataclass, field
@@ -19,6 +20,8 @@ from email.mime.text import MIMEText
 from sqlalchemy.orm import Session
 
 from agents.budget import BudgetAgent, BudgetOverview
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -125,8 +128,11 @@ class AlertService:
         try:
             self._send_email(overview)
             result.email_sent = True
-        except Exception as e:
-            result.error = str(e)
+        except Exception:
+            # Keep the SMTP details (host, user, server replies) in the server
+            # log only; callers and API clients get a fixed message.
+            logger.exception("Failed to send budget alert email")
+            result.error = "Failed to send alert email"
 
         return result
 
