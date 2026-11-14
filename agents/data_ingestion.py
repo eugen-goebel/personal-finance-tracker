@@ -93,9 +93,17 @@ class DataIngestionAgent:
             category=category,
             transaction_type=txn_type,
         )
-        self.db.add(txn)
-        self.db.commit()
-        self.db.refresh(txn)
+        try:
+            self.db.add(txn)
+            self.db.commit()
+            self.db.refresh(txn)
+        except Exception:
+            # A failed flush leaves the session unusable until it is rolled
+            # back. Callers import many rows with one session and carry on
+            # after a failed row, so without this every later row would fail
+            # with PendingRollbackError.
+            self.db.rollback()
+            raise
         return txn
 
     @staticmethod
