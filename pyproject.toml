@@ -2,7 +2,7 @@
 name = "personal-finance-tracker"
 version = "1.0.0"
 description = "Personal finance tracking with a Streamlit dashboard, a FastAPI service and MT940 or OFX statement import"
-requires-python = ">=3.11"
+requires-python = ">=3.11.5"
 dependencies = [
     "fastapi>=0.162.2",
     "uvicorn>=0.54.0",
