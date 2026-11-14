@@ -5,6 +5,7 @@ from datetime import date
 import pytest
 
 from agents.data_ingestion import DataIngestionAgent, TransactionInput
+from db.models import Transaction
 
 
 class TestDataIngestion:
@@ -206,3 +207,49 @@ class TestImportCsvErrorText:
 
         assert result.errors == ["Row 1: could not be saved"]
         assert "secret-internal-marker" in caplog.text
+
+
+class TestFailedSaveDoesNotPoisonTheSession:
+    """One row the database refuses must not make every later row fail.
+
+    SQLite stores NaN as NULL, so a NaN amount trips the NOT NULL constraint on
+    transactions.amount at commit time. That is a real failed flush, not a mock.
+    pydantic accepts NaN for a float field, so the row passes validation first.
+    """
+
+    @staticmethod
+    def _nan_input():
+        return TransactionInput(date=date(2025, 1, 2), description="NaN row", amount=float("nan"))
+
+    def test_add_transaction_rolls_back_and_reraises(self, db):
+        from sqlalchemy.exc import IntegrityError
+
+        agent = DataIngestionAgent(db)
+        with pytest.raises(IntegrityError):
+            agent.add_transaction(self._nan_input())
+
+        # The session is usable again, and the next transaction is saved.
+        txn = agent.add_transaction(
+            TransactionInput(date=date(2025, 1, 3), description="After", amount=-5)
+        )
+        assert txn.id is not None
+        assert len(agent.get_transactions()) == 1
+
+    def test_import_csv_keeps_importing_after_a_failed_row(self, db, caplog):
+        csv = (
+            "date,description,amount\n"
+            "2025-01-01,First,-1\n"
+            "2025-01-02,Broken,nan\n"
+            "2025-01-03,Third,-3\n"
+            "2025-01-04,Fourth,-4\n"
+        )
+        with caplog.at_level("ERROR"):
+            result = DataIngestionAgent(db).import_csv(csv)
+
+        assert result.total_rows == 4
+        assert result.imported == 3
+        assert result.skipped == 1
+        # Only the refused row is reported, with the unchanged fixed message.
+        assert result.errors == ["Row 2: could not be saved"]
+        assert "PendingRollbackError" not in caplog.text
+        assert db.query(Transaction).count() == 3

@@ -296,3 +296,61 @@ class TestCsvUploadErrors:
 
         assert not app.exception
         assert "Missing columns: description" in self._error_text(app)
+
+
+class TestFailedSaveDoesNotPoisonTheImport:
+    """A row the database refuses must not make the rest of the import fail.
+
+    SQLite stores NaN as NULL, so a NaN amount violates NOT NULL on
+    transactions.amount at commit time (a real failed flush).
+    """
+
+    CSV = (
+        b"date,description,amount\n"
+        b"2025-01-01,First,-1\n"
+        b"2025-01-02,Broken,nan\n"
+        b"2025-01-03,Third,-3\n"
+        b"2025-01-04,Fourth,-4\n"
+    )
+
+    @staticmethod
+    def _text(elements):
+        return " ".join(e.value for e in elements)
+
+    def test_csv_import_continues_after_a_failed_row(self, app, caplog):
+        app.sidebar.radio[0].set_value("Import Data").run()
+        app.file_uploader[0].set_value(("nan.csv", self.CSV, "text/csv"))
+        app.run()
+        with caplog.at_level("ERROR"):
+            next(b for b in app.button if b.label == "Import").click().run()
+
+        assert not app.exception
+        assert "Imported 3 of 4 transactions" in self._text(app.success)
+        assert self._text(app.error) == "Row 2: could not be saved"
+        assert "PendingRollbackError" not in caplog.text
+
+    def test_statement_import_continues_after_a_failed_transaction(self, app, monkeypatch, caplog):
+        from datetime import date
+
+        from agents.data_ingestion import TransactionInput
+
+        inputs = [
+            TransactionInput(date=date(2025, 1, 1), description="First", amount=-1),
+            TransactionInput(date=date(2025, 1, 2), description="Broken", amount=float("nan")),
+            TransactionInput(date=date(2025, 1, 3), description="Third", amount=-3),
+            TransactionInput(date=date(2025, 1, 4), description="Fourth", amount=-4),
+        ]
+        monkeypatch.setattr(
+            "agents.bank_statement_parser.BankStatementParser.parse",
+            lambda self_, content, filename: inputs,
+        )
+        app.sidebar.radio[0].set_value("Import Data").run()
+        app.file_uploader[1].set_value(("s.ofx", b"x", "application/octet-stream"))
+        app.run()
+        with caplog.at_level("ERROR"):
+            next(b for b in app.button if b.key == "import_statement").click().run()
+
+        assert not app.exception
+        assert "Imported 3 of 4 transactions" in self._text(app.success)
+        assert self._text(app.error) == "Transaction 2: could not be saved"
+        assert "PendingRollbackError" not in caplog.text

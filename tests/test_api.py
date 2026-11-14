@@ -486,3 +486,71 @@ class TestCsvImportErrorHandling:
         resp = self._upload(client, self.HEADER + "2025-01-01,Gehalt,3000\n2025-01-05,Miete,-850\n")
         assert resp.status_code == 200
         assert resp.json() == {"total_rows": 2, "imported": 2, "skipped": 0, "errors": []}
+
+
+class TestFailedSaveDoesNotPoisonTheRequest:
+    """A row the database refuses must not make the rest of the upload fail.
+
+    SQLite stores NaN as NULL, so a NaN amount violates NOT NULL on
+    transactions.amount at commit time (a real failed flush). pydantic accepts
+    NaN for a float, so the row gets past validation first.
+    """
+
+    @staticmethod
+    def _inputs():
+        from datetime import date
+
+        from agents.data_ingestion import TransactionInput
+
+        return [
+            TransactionInput(date=date(2025, 1, 1), description="First", amount=-1),
+            TransactionInput(date=date(2025, 1, 2), description="Broken", amount=float("nan")),
+            TransactionInput(date=date(2025, 1, 3), description="Third", amount=-3),
+            TransactionInput(date=date(2025, 1, 4), description="Fourth", amount=-4),
+        ]
+
+    def test_statement_import_continues_after_a_failed_transaction(
+        self, client, monkeypatch, caplog
+    ):
+        monkeypatch.setattr(
+            "agents.bank_statement_parser.BankStatementParser.parse",
+            lambda self_, content, filename: self._inputs(),
+        )
+        with caplog.at_level("ERROR"):
+            resp = client.post(
+                "/api/transactions/import-statement",
+                files={"file": ("s.ofx", b"x", "application/octet-stream")},
+            )
+
+        assert resp.status_code == 200
+        assert resp.json() == {
+            "total_rows": 4,
+            "imported": 3,
+            "skipped": 1,
+            "errors": ["Transaction 2: could not be saved"],
+        }
+        assert "PendingRollbackError" not in caplog.text
+        assert len(client.get("/api/transactions/").json()) == 3
+
+    def test_csv_import_continues_after_a_failed_row(self, client, caplog):
+        content = (
+            "date,description,amount\n"
+            "2025-01-01,First,-1\n"
+            "2025-01-02,Broken,nan\n"
+            "2025-01-03,Third,-3\n"
+            "2025-01-04,Fourth,-4\n"
+        )
+        with caplog.at_level("ERROR"):
+            resp = client.post(
+                "/api/transactions/import",
+                files={"file": ("t.csv", content.encode(), "text/csv")},
+            )
+
+        assert resp.status_code == 200
+        assert resp.json() == {
+            "total_rows": 4,
+            "imported": 3,
+            "skipped": 1,
+            "errors": ["Row 2: could not be saved"],
+        }
+        assert "PendingRollbackError" not in caplog.text
