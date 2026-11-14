@@ -5,6 +5,7 @@ carry their currency, and the budget panel reports a month that actually
 holds transactions.
 """
 
+import os
 import sys
 from pathlib import Path
 
@@ -288,6 +289,20 @@ class TestCsvUploadErrors:
         ):
             assert fragment not in shown
 
+    def test_non_finite_amounts_are_reported_by_row(self, app):
+        uploader = self._open_import_page(app)
+        content = b"date,description,amount\n2025-01-01,A,nan\n2025-01-02,B,-inf\n2025-01-03,C,5\n"
+        uploader.set_value(("nonfinite.csv", content, "text/csv"))
+        app.run()
+        self._click_import(app)
+
+        assert not app.exception
+        shown = self._error_text(app)
+        assert "Row 1: amount: Amount must be a finite number" in shown
+        assert "Row 2: amount: Amount must be a finite number" in shown
+        assert "could not be saved" not in shown
+        assert "Imported 1 of 3 transactions" in " ".join(e.value for e in app.success)
+
     def test_missing_columns_message_is_unchanged(self, app):
         uploader = self._open_import_page(app)
         uploader.set_value(("nocols.csv", b"date,amount\n2025-01-01,5\n", "text/csv"))
@@ -301,14 +316,15 @@ class TestCsvUploadErrors:
 class TestFailedSaveDoesNotPoisonTheImport:
     """A row the database refuses must not make the rest of the import fail.
 
-    SQLite stores NaN as NULL, so a NaN amount violates NOT NULL on
-    transactions.amount at commit time (a real failed flush).
+    A SQLite trigger aborts the insert of the row described as "Broken", so the
+    commit fails inside the database engine (a real IntegrityError, not a mock)
+    while the row passes validation first. Every other row is accepted.
     """
 
     CSV = (
         b"date,description,amount\n"
         b"2025-01-01,First,-1\n"
-        b"2025-01-02,Broken,nan\n"
+        b"2025-01-02,Broken,-2\n"
         b"2025-01-03,Third,-3\n"
         b"2025-01-04,Fourth,-4\n"
     )
@@ -317,9 +333,22 @@ class TestFailedSaveDoesNotPoisonTheImport:
     def _text(elements):
         return " ".join(e.value for e in elements)
 
-    def test_csv_import_continues_after_a_failed_row(self, app, caplog):
+    @staticmethod
+    def _refuse_broken_rows(install):
+        """Install the refusing trigger in the dashboard's throwaway database."""
+        sys.path.insert(0, str(REPO_DIR))
+        from db.database import get_engine
+
+        engine = get_engine(os.environ["DATABASE_URL"])
+        try:
+            install(engine, "Broken")
+        finally:
+            engine.dispose()
+
+    def test_csv_import_continues_after_a_failed_row(self, app, refuse_rows_described_as, caplog):
+        self._refuse_broken_rows(refuse_rows_described_as)
         app.sidebar.radio[0].set_value("Import Data").run()
-        app.file_uploader[0].set_value(("nan.csv", self.CSV, "text/csv"))
+        app.file_uploader[0].set_value(("broken.csv", self.CSV, "text/csv"))
         app.run()
         with caplog.at_level("ERROR"):
             next(b for b in app.button if b.label == "Import").click().run()
@@ -329,14 +358,16 @@ class TestFailedSaveDoesNotPoisonTheImport:
         assert self._text(app.error) == "Row 2: could not be saved"
         assert "PendingRollbackError" not in caplog.text
 
-    def test_statement_import_continues_after_a_failed_transaction(self, app, monkeypatch, caplog):
+    def test_statement_import_continues_after_a_failed_transaction(
+        self, app, refuse_rows_described_as, monkeypatch, caplog
+    ):
         from datetime import date
 
         from agents.data_ingestion import TransactionInput
 
         inputs = [
             TransactionInput(date=date(2025, 1, 1), description="First", amount=-1),
-            TransactionInput(date=date(2025, 1, 2), description="Broken", amount=float("nan")),
+            TransactionInput(date=date(2025, 1, 2), description="Broken", amount=-2),
             TransactionInput(date=date(2025, 1, 3), description="Third", amount=-3),
             TransactionInput(date=date(2025, 1, 4), description="Fourth", amount=-4),
         ]
@@ -344,6 +375,7 @@ class TestFailedSaveDoesNotPoisonTheImport:
             "agents.bank_statement_parser.BankStatementParser.parse",
             lambda self_, content, filename: inputs,
         )
+        self._refuse_broken_rows(refuse_rows_described_as)
         app.sidebar.radio[0].set_value("Import Data").run()
         app.file_uploader[1].set_value(("s.ofx", b"x", "application/octet-stream"))
         app.run()

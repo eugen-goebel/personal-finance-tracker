@@ -15,6 +15,7 @@ from pydantic import BaseModel, ValidationError, field_validator
 from sqlalchemy.orm import Session
 
 from agents.categorizer import CategorizerAgent
+from agents.validation import require_finite
 from db.models import Transaction
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,7 @@ class TransactionInput(BaseModel):
     @field_validator("amount")
     @classmethod
     def amount_not_zero(cls, v: float) -> float:
+        require_finite(v, "Amount must be a finite number")
         if v == 0:
             raise ValueError("Amount must not be zero")
         return round(v, 2)
@@ -55,6 +57,15 @@ def _describe_validation_error(exc: ValidationError) -> str:
         message = err["msg"].removeprefix("Value error, ")
         parts.append(f"{field_name}: {message}" if field_name else message)
     return "; ".join(parts)
+
+
+def _is_blank(value) -> bool:
+    """True for an empty CSV cell, which pandas reads as NaN.
+
+    A cell holding only spaces is a string and goes through the normal
+    validation ("Description must not be empty").
+    """
+    return bool(pd.isna(value))
 
 
 @dataclass
@@ -123,7 +134,11 @@ class DataIngestionAgent:
             file_content = file_content.decode("utf-8")
 
         try:
-            df = pd.read_csv(io.StringIO(file_content))
+            # Only a truly empty cell counts as missing. pandas' default NA
+            # tokens ("nan", "NA", "NULL", ...) stay text and go through the
+            # normal checks, so a literal "nan" amount is reported as not finite
+            # rather than as missing.
+            df = pd.read_csv(io.StringIO(file_content), keep_default_na=False, na_values=[""])
         except Exception:
             # pandas' message can quote file content and parser internals, so it
             # goes to the server log only; the caller gets a fixed message.
@@ -145,6 +160,14 @@ class DataIngestionAgent:
 
         for idx, row in df.iterrows():
             row_no = idx + 1
+
+            # An empty cell reaches us as NaN: str(NaN) is "nan", a valid-looking
+            # description, and pd.to_datetime(NaN) is NaT, which TransactionInput
+            # rejects with a TypeError rather than a ValidationError.
+            missing = [col for col in ("date", "description", "amount") if _is_blank(row[col])]
+            if missing:
+                self._skip(result, f"Row {row_no}: missing {', '.join(missing)}")
+                continue
 
             # Messages written by this project (validation rules) are returned as
             # they are. Anything raised by pandas, pydantic's wrapper or the

@@ -84,6 +84,48 @@ class TestSavingsGoalsAgent:
 # ---------------------------------------------------------------------------
 
 
+class TestNonFiniteAmounts:
+    """NaN and infinity are rejected like other invalid amounts: ValueError."""
+
+    NON_FINITE = [float("nan"), float("inf"), float("-inf")]
+
+    @pytest.mark.parametrize("value", NON_FINITE)
+    def test_create_rejects_non_finite_target(self, db, value):
+        with pytest.raises(ValueError, match="target_amount must be a finite number"):
+            SavingsGoalsAgent(db).create_goal(name="X", target_amount=value)
+        assert SavingsGoalsAgent(db).list_goals() == []
+
+    @pytest.mark.parametrize("value", NON_FINITE)
+    def test_create_rejects_non_finite_current(self, db, value):
+        with pytest.raises(ValueError, match="current_amount must be a finite number"):
+            SavingsGoalsAgent(db).create_goal(name="X", target_amount=100, current_amount=value)
+        assert SavingsGoalsAgent(db).list_goals() == []
+
+    @pytest.mark.parametrize("value", NON_FINITE)
+    def test_update_rejects_non_finite_amounts(self, db, value):
+        agent = SavingsGoalsAgent(db)
+        goal = agent.create_goal(name="X", target_amount=100, current_amount=10)
+
+        with pytest.raises(ValueError, match="target_amount must be a finite number"):
+            agent.update_goal(goal.id, target_amount=value)
+        with pytest.raises(ValueError, match="current_amount must be a finite number"):
+            agent.update_goal(goal.id, current_amount=value)
+
+        db.refresh(goal)
+        assert (goal.target_amount, goal.current_amount) == (100, 10)
+
+    @pytest.mark.parametrize("value", NON_FINITE)
+    def test_contribute_rejects_non_finite_amount(self, db, value):
+        agent = SavingsGoalsAgent(db)
+        goal = agent.create_goal(name="X", target_amount=100, current_amount=10)
+
+        with pytest.raises(ValueError, match="contribution must be a finite number"):
+            agent.contribute(goal.id, value)
+
+        db.refresh(goal)
+        assert goal.current_amount == 10
+
+
 class TestComputeProgress:
     def test_open_ended_goal_has_no_deadline_fields(self):
         goal = SavingsGoal(name="Open", target_amount=1000, current_amount=200)
@@ -207,3 +249,42 @@ class TestSavingsGoalsAPI:
         r = api_client.post("/api/goals/", json={"name": "Dup", "target_amount": 200})
         assert r.status_code == 400
         assert "already exists" in r.json()["detail"]
+
+    @pytest.mark.parametrize("literal", ["NaN", "Infinity", "-Infinity"])
+    def test_non_finite_amounts_rejected_by_api(self, api_client, literal):
+        # json.loads accepts these non-standard literals; httpx cannot encode them.
+        def send(method, path, body):
+            return api_client.request(
+                method, path, content=body, headers={"content-type": "application/json"}
+            )
+
+        r = send("POST", "/api/goals/", f'{{"name": "A", "target_amount": {literal}}}')
+        assert r.status_code == 422
+        assert r.json()["detail"][0]["msg"] == "Value error, target_amount must be a finite number"
+
+        r = send(
+            "POST",
+            "/api/goals/",
+            f'{{"name": "B", "target_amount": 10, "current_amount": {literal}}}',
+        )
+        assert r.status_code == 422
+        assert r.json()["detail"][0]["msg"] == "Value error, current_amount must be a finite number"
+        assert api_client.get("/api/goals/").json() == []
+
+        goal_id = api_client.post("/api/goals/", json={"name": "C", "target_amount": 100}).json()[
+            "id"
+        ]
+        r = send("POST", f"/api/goals/{goal_id}/contribute", f'{{"amount": {literal}}}')
+        assert r.status_code == 422
+        assert r.json()["detail"][0]["msg"] == "Value error, contribution must be a finite number"
+
+        # Updates have no pydantic validators; the agent's ValueError becomes a 400.
+        r = send("PUT", f"/api/goals/{goal_id}", f'{{"target_amount": {literal}}}')
+        assert r.status_code == 400
+        assert r.json()["detail"] == "target_amount must be a finite number"
+        r = send("PUT", f"/api/goals/{goal_id}", f'{{"current_amount": {literal}}}')
+        assert r.status_code == 400
+        assert r.json()["detail"] == "current_amount must be a finite number"
+
+        goal = api_client.get(f"/api/goals/{goal_id}").json()
+        assert (goal["target_amount"], goal["current_amount"]) == (100, 0)

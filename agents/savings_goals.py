@@ -7,6 +7,7 @@ from datetime import date, datetime, timezone
 
 from sqlalchemy.orm import Session
 
+from agents.validation import require_finite
 from db.models import SavingsGoal
 
 
@@ -37,6 +38,8 @@ class SavingsGoalsAgent:
         target_date: date | None = None,
         current_amount: float = 0.0,
     ) -> SavingsGoal:
+        require_finite(target_amount, "target_amount must be a finite number")
+        require_finite(current_amount, "current_amount must be a finite number")
         if target_amount <= 0:
             raise ValueError("target_amount must be positive")
         if current_amount < 0:
@@ -80,10 +83,12 @@ class SavingsGoalsAgent:
         if name is not None:
             goal.name = name
         if target_amount is not None:
+            require_finite(target_amount, "target_amount must be a finite number")
             if target_amount <= 0:
                 raise ValueError("target_amount must be positive")
             goal.target_amount = target_amount
         if current_amount is not None:
+            require_finite(current_amount, "current_amount must be a finite number")
             if current_amount < 0:
                 raise ValueError("current_amount cannot be negative")
             goal.current_amount = current_amount
@@ -98,6 +103,7 @@ class SavingsGoalsAgent:
 
     def contribute(self, goal_id: int, amount: float) -> SavingsGoal | None:
         """Add ``amount`` to ``current_amount`` of the goal."""
+        require_finite(amount, "contribution must be a finite number")
         if amount <= 0:
             raise ValueError("contribution must be positive")
         goal = self.get_goal(goal_id)

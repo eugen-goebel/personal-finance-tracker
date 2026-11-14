@@ -184,6 +184,14 @@ class TestOFXParsing:
         assert any("REWE" in d for d in descriptions)
         assert any("Arbeitgeber" in d for d in descriptions)
 
+    @pytest.mark.parametrize("literal", [b"NaN", b"Infinity", b"-Infinity", b"1e999"])
+    def test_non_finite_amount_makes_the_statement_unreadable(self, parser, literal):
+        # ofxparse turns these into nan or inf floats; they must not become
+        # TransactionInput objects. The whole statement is refused.
+        content = SAMPLE_OFX.replace(b"<TRNAMT>-67.43", b"<TRNAMT>" + literal)
+        with pytest.raises(StatementParseError, match="Failed to parse OFX"):
+            parser.parse(content, "bad.ofx")
+
 
 # ---------------------------------------------------------------------------
 # Format detection and error handling

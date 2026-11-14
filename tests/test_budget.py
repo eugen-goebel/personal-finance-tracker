@@ -2,6 +2,8 @@
 
 from datetime import date
 
+import pytest
+
 from agents.budget import BudgetAgent
 from agents.data_ingestion import DataIngestionAgent, TransactionInput
 
@@ -96,3 +98,19 @@ class TestBudget:
         agent.set_budget("Transport", 100.00)
         overview = agent.get_status(2025, 1)
         assert overview.total_budget == 300.00
+
+
+class TestNonFiniteLimit:
+    @pytest.mark.parametrize("limit", [float("nan"), float("inf"), float("-inf")])
+    def test_set_budget_rejects_non_finite_limit(self, db, limit):
+        agent = BudgetAgent(db)
+        with pytest.raises(ValueError, match="Monthly limit must be a finite number"):
+            agent.set_budget("Lebensmittel", limit)
+        assert agent.get_budgets() == []
+
+    def test_a_rejected_update_keeps_the_old_limit(self, db):
+        agent = BudgetAgent(db)
+        agent.set_budget("Lebensmittel", 200.00)
+        with pytest.raises(ValueError, match="Monthly limit must be a finite number"):
+            agent.set_budget("Lebensmittel", float("inf"))
+        assert [b.monthly_limit for b in agent.get_budgets()] == [200.00]
