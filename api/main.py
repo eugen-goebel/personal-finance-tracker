@@ -8,10 +8,14 @@ To run:
     uvicorn api.main:app --reload
 """
 
+import math
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 # Load .env before the imports below, so db.database sees DATABASE_URL when it
 # reads it at module level. Real environment variables still win, which is how
@@ -35,6 +39,25 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(request: Request, exc: RequestValidationError):
+    """Answer 422 as FastAPI does, minus an echoed NaN or infinity.
+
+    FastAPI copies the rejected value into each error under "input". NaN and
+    infinity cannot be encoded as JSON, so echoing a rejected non-finite amount
+    would turn the 422 into a 500. Those values are left out; everything else
+    stays as in FastAPI's default response.
+    """
+    errors = []
+    for error in exc.errors():
+        value = error.get("input")
+        if isinstance(value, float) and not math.isfinite(value):
+            error = {key: item for key, item in error.items() if key != "input"}
+        errors.append(error)
+    return JSONResponse(status_code=422, content={"detail": jsonable_encoder(errors)})
+
 
 # Register route modules
 app.include_router(transactions.router)

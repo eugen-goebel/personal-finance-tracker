@@ -11,14 +11,20 @@ from db.database import Base, get_db
 
 
 @pytest.fixture
-def client():
-    """Create a test client with an in-memory database."""
+def engine():
+    """An in-memory database shared by every connection of one test."""
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
     Base.metadata.create_all(bind=engine)
+    return engine
+
+
+@pytest.fixture
+def client(engine):
+    """Create a test client with an in-memory database."""
     TestSession = sessionmaker(bind=engine)
 
     def override_get_db():
@@ -488,12 +494,116 @@ class TestCsvImportErrorHandling:
         assert resp.json() == {"total_rows": 2, "imported": 2, "skipped": 0, "errors": []}
 
 
+class TestNonFiniteAmounts:
+    """NaN and infinity must be answered with 422, never stored or a 500.
+
+    json.loads (which FastAPI uses) accepts the non-standard literals NaN,
+    Infinity and -Infinity, so a client can send them even though they are not
+    valid JSON. httpx refuses to encode them, hence the raw request bodies.
+    """
+
+    LITERALS = ["NaN", "Infinity", "-Infinity"]
+
+    @staticmethod
+    def _post(client, path, body):
+        return client.post(path, content=body, headers={"content-type": "application/json"})
+
+    @staticmethod
+    def _detail_messages(resp):
+        return [item["msg"] for item in resp.json()["detail"]]
+
+    @pytest.mark.parametrize("literal", LITERALS)
+    def test_transaction_amount_is_rejected(self, client, literal):
+        resp = self._post(
+            client,
+            "/api/transactions/",
+            f'{{"date": "2025-01-15", "description": "Test", "amount": {literal}}}',
+        )
+        assert resp.status_code == 422
+        assert self._detail_messages(resp) == ["Value error, Amount must be a finite number"]
+        assert client.get("/api/transactions/").json() == []
+
+    def test_other_validation_errors_still_echo_the_input(self, client):
+        # Only a non-finite input is left out of the 422 body.
+        resp = self._post(
+            client,
+            "/api/transactions/",
+            '{"date": "2025-01-15", "description": "Test", "amount": "abc"}',
+        )
+        assert resp.status_code == 422
+        assert resp.json()["detail"][0]["input"] == "abc"
+
+    def test_transaction_amount_beyond_float_range_is_rejected(self, client):
+        # 1e999 is valid JSON, but Python reads it as infinity.
+        resp = self._post(
+            client,
+            "/api/transactions/",
+            '{"date": "2025-01-15", "description": "Test", "amount": 1e999}',
+        )
+        assert resp.status_code == 422
+        assert client.get("/api/transactions/").json() == []
+
+    @pytest.mark.parametrize("literal", LITERALS)
+    def test_budget_limit_is_rejected(self, client, literal):
+        resp = self._post(
+            client, "/api/budgets/", f'{{"category": "Lebensmittel", "monthly_limit": {literal}}}'
+        )
+        assert resp.status_code == 422
+        assert self._detail_messages(resp) == ["Value error, Monthly limit must be a finite number"]
+        assert client.get("/api/budgets/").json() == []
+
+    def test_csv_import_reports_non_finite_rows(self, client):
+        content = (
+            "date,description,amount\n"
+            "2025-01-01,First,-1\n"
+            "2025-01-02,Not a number,nan\n"
+            "2025-01-03,Plus infinity,inf\n"
+            "2025-01-04,Last,-4\n"
+        )
+        resp = client.post(
+            "/api/transactions/import",
+            files={"file": ("t.csv", content.encode(), "text/csv")},
+        )
+        assert resp.status_code == 200
+        assert resp.json() == {
+            "total_rows": 4,
+            "imported": 2,
+            "skipped": 2,
+            "errors": [
+                "Row 2: amount: Amount must be a finite number",
+                "Row 3: amount: Amount must be a finite number",
+            ],
+        }
+        assert len(client.get("/api/transactions/").json()) == 2
+
+    @pytest.mark.parametrize("literal", ["NaN", "Infinity", "1e999"])
+    def test_statement_with_a_non_finite_amount_is_refused(self, client, literal):
+        # ofxparse reads these amounts without complaint. The statement is
+        # refused as a whole, with the fixed parse message and nothing stored.
+        content = (
+            b"OFXHEADER:100\nDATA:OFXSGML\nVERSION:102\nSECURITY:NONE\nENCODING:USASCII\n"
+            b"CHARSET:1252\nCOMPRESSION:NONE\nOLDFILEUID:NONE\nNEWFILEUID:NONE\n\n"
+            b"<OFX><BANKMSGSRSV1><STMTTRNRS><STMTRS><CURDEF>EUR"
+            b"<BANKACCTFROM><BANKID>1<ACCTID>1<ACCTTYPE>CHECKING</BANKACCTFROM>"
+            b"<BANKTRANLIST><STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20250115"
+            b"<TRNAMT>" + literal.encode() + b"<FITID>1<NAME>REWE</STMTTRN></BANKTRANLIST>"
+            b"</STMTRS></STMTTRNRS></BANKMSGSRSV1></OFX>"
+        )
+        resp = client.post(
+            "/api/transactions/import-statement",
+            files={"file": ("s.ofx", content, "application/octet-stream")},
+        )
+        assert resp.status_code == 400
+        assert resp.json()["detail"].startswith("Failed to parse OFX file")
+        assert client.get("/api/transactions/").json() == []
+
+
 class TestFailedSaveDoesNotPoisonTheRequest:
     """A row the database refuses must not make the rest of the upload fail.
 
-    SQLite stores NaN as NULL, so a NaN amount violates NOT NULL on
-    transactions.amount at commit time (a real failed flush). pydantic accepts
-    NaN for a float, so the row gets past validation first.
+    A SQLite trigger aborts the insert of the row described as "Broken", so the
+    commit fails inside the database engine (a real IntegrityError, not a mock)
+    while the row passes validation first. Every other row is accepted.
     """
 
     @staticmethod
@@ -504,14 +614,15 @@ class TestFailedSaveDoesNotPoisonTheRequest:
 
         return [
             TransactionInput(date=date(2025, 1, 1), description="First", amount=-1),
-            TransactionInput(date=date(2025, 1, 2), description="Broken", amount=float("nan")),
+            TransactionInput(date=date(2025, 1, 2), description="Broken", amount=-2),
             TransactionInput(date=date(2025, 1, 3), description="Third", amount=-3),
             TransactionInput(date=date(2025, 1, 4), description="Fourth", amount=-4),
         ]
 
     def test_statement_import_continues_after_a_failed_transaction(
-        self, client, monkeypatch, caplog
+        self, client, engine, refuse_rows_described_as, monkeypatch, caplog
     ):
+        refuse_rows_described_as(engine, "Broken")
         monkeypatch.setattr(
             "agents.bank_statement_parser.BankStatementParser.parse",
             lambda self_, content, filename: self._inputs(),
@@ -532,11 +643,14 @@ class TestFailedSaveDoesNotPoisonTheRequest:
         assert "PendingRollbackError" not in caplog.text
         assert len(client.get("/api/transactions/").json()) == 3
 
-    def test_csv_import_continues_after_a_failed_row(self, client, caplog):
+    def test_csv_import_continues_after_a_failed_row(
+        self, client, engine, refuse_rows_described_as, caplog
+    ):
+        refuse_rows_described_as(engine, "Broken")
         content = (
             "date,description,amount\n"
             "2025-01-01,First,-1\n"
-            "2025-01-02,Broken,nan\n"
+            "2025-01-02,Broken,-2\n"
             "2025-01-03,Third,-3\n"
             "2025-01-04,Fourth,-4\n"
         )

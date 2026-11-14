@@ -10,6 +10,7 @@ from datetime import date
 
 from sqlalchemy.orm import Session
 
+from agents.validation import require_finite
 from db.models import Budget, Transaction
 
 
@@ -47,6 +48,7 @@ class BudgetAgent:
 
     def set_budget(self, category: str, monthly_limit: float) -> Budget:
         """Set or update a monthly budget for a category."""
+        require_finite(monthly_limit, "Monthly limit must be a finite number")
         existing = self.db.query(Budget).filter(Budget.category == category).first()
 
         if existing:

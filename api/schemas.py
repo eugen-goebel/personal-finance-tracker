@@ -9,6 +9,8 @@ from datetime import date
 
 from pydantic import BaseModel, field_validator
 
+from agents.validation import require_finite
+
 
 class TransactionCreate(BaseModel):
     """Request body for creating a transaction."""
@@ -28,6 +30,7 @@ class TransactionCreate(BaseModel):
     @field_validator("amount")
     @classmethod
     def amount_not_zero(cls, v: float) -> float:
+        require_finite(v, "Amount must be a finite number")
         if v == 0:
             raise ValueError("Amount must not be zero")
         return round(v, 2)
@@ -55,6 +58,7 @@ class BudgetCreate(BaseModel):
     @field_validator("monthly_limit")
     @classmethod
     def limit_positive(cls, v: float) -> float:
+        require_finite(v, "Monthly limit must be a finite number")
         if v <= 0:
             raise ValueError("Monthly limit must be positive")
         return round(v, 2)
@@ -101,6 +105,7 @@ class GoalCreate(BaseModel):
     @field_validator("target_amount")
     @classmethod
     def target_positive(cls, v: float) -> float:
+        require_finite(v, "target_amount must be a finite number")
         if v <= 0:
             raise ValueError("target_amount must be positive")
         return round(v, 2)
@@ -108,6 +113,7 @@ class GoalCreate(BaseModel):
     @field_validator("current_amount")
     @classmethod
     def current_non_negative(cls, v: float) -> float:
+        require_finite(v, "current_amount must be a finite number")
         if v < 0:
             raise ValueError("current_amount cannot be negative")
         return round(v, 2)
@@ -131,6 +137,7 @@ class GoalContribution(BaseModel):
     @field_validator("amount")
     @classmethod
     def positive(cls, v: float) -> float:
+        require_finite(v, "contribution must be a finite number")
         if v <= 0:
             raise ValueError("contribution must be positive")
         return round(v, 2)
