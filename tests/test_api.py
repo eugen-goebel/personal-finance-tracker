@@ -246,3 +246,46 @@ class TestAPI:
             },
         )
         assert resp.status_code == 422
+
+
+class TestBudgetAlertsErrorHandling:
+    """The alert endpoint must not leak SMTP exception details to the client."""
+
+    SECRET = "smtp.internal.corp:587 login failed for svc-alerts (password hunter2)"
+
+    def test_smtp_failure_is_not_exposed(self, client, monkeypatch, caplog):
+        monkeypatch.setenv("SMTP_HOST", "smtp.internal.corp")
+        monkeypatch.setenv("SMTP_USER", "svc-alerts")
+        monkeypatch.setenv("SMTP_PASSWORD", "hunter2")
+        monkeypatch.setenv("ALERT_RECIPIENT", "admin@example.com")
+
+        def failing_smtp(*args, **kwargs):
+            raise OSError(self.SECRET)
+
+        monkeypatch.setattr("agents.alert_service.smtplib.SMTP", failing_smtp)
+
+        client.post(
+            "/api/transactions/",
+            json={
+                "date": "2025-01-15",
+                "description": "REWE",
+                "amount": -150.0,
+                "category": "Lebensmittel",
+            },
+        )
+        client.post("/api/budgets/", json={"category": "Lebensmittel", "monthly_limit": 100.0})
+
+        with caplog.at_level("ERROR"):
+            resp = client.post("/api/budgets/alerts?year=2025&month=1&dry_run=false")
+
+        # Status code and result shape are unchanged ...
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["alerts_triggered"] == 1
+        assert body["email_sent"] is False
+        # ... the client gets a generic message, not the exception text ...
+        assert body["error"] == "Failed to send alert email"
+        assert "hunter2" not in resp.text
+        assert "smtp.internal.corp" not in resp.text
+        # ... and the detail is logged server-side.
+        assert self.SECRET in caplog.text
