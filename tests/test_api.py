@@ -372,3 +372,117 @@ class TestStatementImportErrorHandling:
         assert body["errors"][0].startswith("Transaction 1:")
         assert "secret-internal-marker" not in resp.text
         assert self.SECRET in caplog.text
+
+
+class TestCsvImportErrorHandling:
+    """The CSV import must not leak pandas/pydantic/SQLAlchemy exception text."""
+
+    SECRET = "secret-internal-marker /srv/app/lib/parser.py offset 4711 IBAN DE00123456789"
+    HEADER = "date,description,amount\n"
+    # What the endpoint answered before the fix would contain at least one of these.
+    LIBRARY_TEXT = (
+        "No columns to parse",
+        "could not convert string to float",
+        "Unknown datetime",
+        "validation error for",
+        "errors.pydantic.dev",
+        "input_value",
+    )
+
+    @staticmethod
+    def _upload(client, content, name="transactions.csv"):
+        return client.post(
+            "/api/transactions/import",
+            files={"file": (name, content, "text/csv")},
+        )
+
+    def _assert_no_library_text(self, resp):
+        assert "secret-internal-marker" not in resp.text
+        assert "4711" not in resp.text
+        for fragment in self.LIBRARY_TEXT:
+            assert fragment not in resp.text
+
+    def test_csv_parser_error_is_not_exposed(self, client, monkeypatch, caplog):
+        def failing_read_csv(*args, **kwargs):
+            raise ValueError(self.SECRET)
+
+        monkeypatch.setattr("agents.data_ingestion.pd.read_csv", failing_read_csv)
+
+        with caplog.at_level("ERROR"):
+            resp = self._upload(client, self.HEADER + "2025-01-01,Gehalt,3000\n")
+
+        # Status code and response shape are unchanged ...
+        assert resp.status_code == 200
+        assert resp.json() == {
+            "total_rows": 0,
+            "imported": 0,
+            "skipped": 0,
+            "errors": ["Failed to parse CSV: the file could not be read as CSV"],
+        }
+        # ... without the library text ...
+        self._assert_no_library_text(resp)
+        # ... which is logged server-side instead.
+        assert self.SECRET in caplog.text
+
+    def test_genuinely_unreadable_csv_gets_fixed_message(self, client):
+        resp = self._upload(client, b"")
+        assert resp.status_code == 200
+        assert resp.json()["errors"] == ["Failed to parse CSV: the file could not be read as CSV"]
+        self._assert_no_library_text(resp)
+
+    def test_missing_columns_message_is_unchanged(self, client):
+        resp = self._upload(client, "date,amount\n2025-01-01,100\n")
+        assert resp.status_code == 200
+        assert resp.json()["errors"] == ["Missing columns: description"]
+        assert resp.json()["imported"] == 0
+
+    def test_row_save_failure_is_not_exposed(self, client, monkeypatch, caplog):
+        def failing_add(self_, txn_input):
+            raise RuntimeError(self.SECRET)
+
+        monkeypatch.setattr("agents.data_ingestion.DataIngestionAgent.add_transaction", failing_add)
+
+        with caplog.at_level("ERROR"):
+            resp = self._upload(client, self.HEADER + "2025-01-01,Gehalt,3000\n")
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["total_rows"] == 1
+        assert body["imported"] == 0
+        assert body["skipped"] == 1
+        assert body["errors"] == ["Row 1: could not be saved"]
+        self._assert_no_library_text(resp)
+        assert self.SECRET in caplog.text
+
+    def test_invalid_date_and_amount_are_reported_without_library_text(self, client):
+        content = self.HEADER + "not-a-date,Gehalt,3000\n2025-01-02,Miete,abc\n2025-01-03,REWE,-5\n"
+        resp = self._upload(client, content)
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["total_rows"] == 3
+        assert body["imported"] == 1
+        assert body["skipped"] == 2
+        assert body["errors"] == ["Row 1: invalid date", "Row 2: invalid amount"]
+        self._assert_no_library_text(resp)
+
+    def test_validation_messages_still_reach_the_client(self, client):
+        content = self.HEADER + '2025-01-01,"  ",5\n2025-01-02,Gehalt,0\n'
+        resp = self._upload(client, content)
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["imported"] == 0
+        assert body["skipped"] == 2
+        # The project's own rules are named by field and constraint ...
+        assert body["errors"] == [
+            "Row 1: description: Description must not be empty",
+            "Row 2: amount: Amount must not be zero",
+        ]
+        # ... without pydantic's wrapper (model name, input value, docs URL).
+        self._assert_no_library_text(resp)
+
+    def test_valid_csv_still_imports(self, client):
+        resp = self._upload(client, self.HEADER + "2025-01-01,Gehalt,3000\n2025-01-05,Miete,-850\n")
+        assert resp.status_code == 200
+        assert resp.json() == {"total_rows": 2, "imported": 2, "skipped": 0, "errors": []}

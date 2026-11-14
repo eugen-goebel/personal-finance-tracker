@@ -155,3 +155,54 @@ class TestDataIngestion:
     def test_validation_zero_amount(self):
         with pytest.raises(ValueError):
             TransactionInput(date=date(2025, 1, 1), description="Test", amount=0)
+
+
+class TestImportCsvErrorText:
+    """import_csv reports what failed, never the underlying library text."""
+
+    def test_unreadable_csv_message_is_fixed(self, db, monkeypatch, caplog):
+        def failing_read_csv(*args, **kwargs):
+            raise RuntimeError("secret-internal-marker offset 4711")
+
+        monkeypatch.setattr("agents.data_ingestion.pd.read_csv", failing_read_csv)
+        with caplog.at_level("ERROR"):
+            result = DataIngestionAgent(db).import_csv("date,description,amount\n")
+
+        assert result.errors == ["Failed to parse CSV: the file could not be read as CSV"]
+        assert result.total_rows == 0
+        assert "secret-internal-marker offset 4711" in caplog.text
+
+    def test_row_errors_name_the_row_and_the_problem(self, db, caplog):
+        csv = (
+            "date,description,amount\n"
+            "bad,A,1\n"
+            "2025-01-02,B,abc\n"
+            '2025-01-03,"  ",5\n'
+            "2025-01-04,D,0\n"
+            "2025-01-05,E,10\n"
+        )
+        with caplog.at_level("WARNING"):
+            result = DataIngestionAgent(db).import_csv(csv)
+
+        assert result.imported == 1
+        assert result.skipped == 4
+        assert result.errors == [
+            "Row 1: invalid date",
+            "Row 2: invalid amount",
+            "Row 3: description: Description must not be empty",
+            "Row 4: amount: Amount must not be zero",
+        ]
+        # The original exception is still available to operators.
+        assert "Unknown datetime" in caplog.text
+        assert "could not convert string to float" in caplog.text
+
+    def test_row_save_failure_is_logged_not_returned(self, db, monkeypatch, caplog):
+        def failing_add(self_, txn_input):
+            raise RuntimeError("INSERT INTO transactions ... secret-internal-marker")
+
+        monkeypatch.setattr(DataIngestionAgent, "add_transaction", failing_add)
+        with caplog.at_level("ERROR"):
+            result = DataIngestionAgent(db).import_csv("date,description,amount\n2025-01-01,A,1\n")
+
+        assert result.errors == ["Row 1: could not be saved"]
+        assert "secret-internal-marker" in caplog.text
