@@ -4,7 +4,7 @@
 # dashboard (app.py) and the FastAPI service (api/main.py). mt-940 and
 # ofxparse are needed because the import feature parses bank statements
 # in those formats, python-dotenv loads the .env file.
-fastapi>=0.163.1
+fastapi>=0.165.0
 uvicorn>=0.54.0
 sqlalchemy>=2.1.9
 streamlit>=1.67.0
